@@ -238,7 +238,8 @@ flowchart LR
 Content/
 ├── Portfolio/        # (git) 직접 만든 블루프린트, 데이터, 레벨, 기본 세트
 ├── Characters/       # (git) 템플릿 기본 마네킹
-├── Portfolio/CC0/    # (git) CC0 애니메이션과 검 메시, 리타깃 결과 (5.3 참고)
+├── Portfolio/Animations/Quaternius/  # (git) CC0 원본 임포트와 IK Rig/Retargeter (5.3 참고)
+├── Portfolio/Animations/Retargeted/  # (git) 마네킹으로 리타깃한 결과
 └── ThirdParty/       # (git 제외) Fab 유료 원본 + 이를 참조하는 몽타주, Release 세트
 ```
 
@@ -260,7 +261,11 @@ Content/
 
 - UE 5.6부터 Third Person 템플릿에 **Combat 변형(Variant)**이 있고, 맨손 전투, 대상 지정, 체력 시스템이 포함되어 있다.
 - 이 변형으로 **참고용 프로젝트를 따로 만들고**(저장소에 넣지 않음), 거기서 공격/피격 애니메이션만 메인 프로젝트로 가져와 기본 세트에 쓴다.
-- **근접 무기(검)로 결정하면서 변경 검토 중**: Combat 변형은 맨손 전투라 검 애니메이션이 없다. 깃 버전 후보는 Quaternius Universal Animation Library 2(CC0, 타격별로 나뉜 3~4타 콤보와 회복 동작)와 LowPoly Medieval Weapons(CC0, 검 메시)다. 검 콤보가 무료 범위에 있으면 이쪽으로 교체하고, Combat 변형 프로젝트는 비교 분석용으로만 남긴다.
+- **결정 (2026-11-15)**: 깃 버전 검 애니메이션은 **Quaternius UAL2 Standard**(무료, CC0)의 루트 모션 버전(`UAL2_Standard_RM.glb`)을 쓴다. Combat 변형 프로젝트는 비교 분석용으로만 남긴다. 검 메시 후보는 LowPoly Medieval Weapons(CC0).
+  - 확인된 검/근접 동작: `Sword_Regular_A/B/C`(+ 각 `_Rec`), `Sword_Regular_Combo`, `Sword_Heavy_Combo`, `Sword_Block`, `Sword_Dash`, `Hit_Knockback`, `Melee_Hook`(+ `_Rec`), `Shield_Dash`, `Shield_OneShot`
+  - **빈 곳**: 회피(구르기, 스텝), 방향별 피격 반응
+  - 스켈레톤은 UE4 마네킹 본 이름 규칙(`root`, `pelvis`, `spine_01~03`)이며 T 포즈. 자동 생성 IK Retargeter로 UE5 Manny에 리타깃되고 루트 모션도 유지됨을 0-5에서 확인했다.
+  - 임포트: Interchange glTF, 스켈레톤 None(새로 생성). 제작자 안내(`Unreal_Setup.png`)는 `Use 30Hz to Bake Bone Animation`, `Snap to Closest Frame Boundary`를 켜라고 한다.
 - Fab 에셋은 무료라도 Standard License라 깃에 넣을 수 없다. Mixamo도 원본 재배포 금지라 깃 제외. 둘 다 배포 빌드에는 쓸 수 있다.
 - 배포 빌드 후보: Fab의 UE5 마네킹 기반 검 애니메이션 팩 (예: GameDevHero One Handed Sword V2, Sword and Shield V1, Great Sword V1). 가격과 라이선스는 구매 전 확인.
 - ⚠️ 템플릿에 전투가 이미 있으므로, 평가자가 "템플릿 전투를 그대로 쓴 것"으로 볼 위험이 있다. 로직은 템플릿 코드를 쓰지 않고 새로 설계하며, PDF에 **"템플릿 Combat 변형과 무엇이 다른가"** 비교 페이지를 둔다.
@@ -288,9 +293,9 @@ Content/
 
 ### Phase 0. 준비
 - [ ] 메인/참고 프로젝트 생성, 플러그인 활성화
-- [ ] Git 저장소, LFS, `.gitignore`(`Content/ThirdParty/` 포함)
-- [ ] Quaternius UAL2 무료 버전에 검 콤보, 피격 애니메이션이 있는지 확인
-- [ ] **리타깃 검증**: UAL2 애니메이션 하나, Fab 후보 하나를 마네킹에 리타깃해 재생 확인 (가장 큰 리스크를 먼저 확인)
+- [x] Git 저장소, LFS, `.gitignore`(`Content/ThirdParty/` 포함)
+- [x] Quaternius UAL2 무료 버전에 검 콤보, 피격 애니메이션이 있는지 확인 → 검 콤보, 강공격, 가드 있음. 회피와 방향별 피격 없음 (5.3)
+- [ ] **리타깃 검증**: UAL2 애니메이션 하나, Fab 후보 하나를 마네킹에 리타깃해 재생 확인 (가장 큰 리스크를 먼저 확인) → UAL2 완료, Fab 남음
 - [ ] 유료 에셋 후보 목록과 라이선스 확인
 - [x] 역기획할 레퍼런스 게임과 요소 결정 → 데빌 메이 크라이, 타격 반응과 간격
 
@@ -375,7 +380,7 @@ Content/
 | 부위 반응 | 항상 / 조건부 | **결정**: 상대 충격량이 임계값 이상일 때만 |
 | 상대 충격량 계산 | 매니저 / 받는 쪽 각자 | 제안: 매니저가 한 번 |
 | 전투 형태 | 맨손 격투 / 근접 무기 | **결정**: 근접 무기(검). 공격이 닿는 거리가 길어 타격 후 간격과 질량에 따른 분배가 더 분명하게 보인다 |
-| 깃 버전 애니메이션 출처 | 템플릿 Combat 변형 / Quaternius(CC0) | 후보: Quaternius UAL2. 검 콤보가 무료 범위에 있는지 확인 후 결정 (5.3) |
+| 깃 버전 애니메이션 출처 | 템플릿 Combat 변형 / Quaternius(CC0) | **결정**: Quaternius UAL2 Standard 루트 모션 버전. 회피와 방향별 피격은 무료 범위에 없어 별도 결정 (5.3) |
 | 방어 수단 | 가드 / 패리 / 저스트 회피 | **결정**: 셋 다 구현 (매니저 규칙, 4.6). 폴리싱은 공격 최우선 (3.3) |
 | AI 구조 | StateTree / Behavior Tree | 제안: StateTree |
 | ASC 위치 | 캐릭터 / PlayerState | 제안: 캐릭터 |

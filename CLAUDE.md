@@ -134,10 +134,13 @@
 5. 기본 세트의 공격/피격 애니메이션은 **CC0 에셋만** 쓴다 (후보: Quaternius UAL2, 검 메시는 LowPoly Medieval Weapons). Fab 무료 에셋과 Mixamo는 깃에 넣지 않는다.
 6. Release 세트 선택은 `UPortfolioContentSettings`가 하고, 로드 실패 시 Default로 폴백한다.
 
-### 5.1 소켓 / 노티파이 이름 규약 (초안, 스텝 진행 중 확정)
+### 5.1 소켓 / 노티파이 / 에셋 이름 규약 (초안, 스텝 진행 중 확정)
 
 | 이름 | 용도 |
 |---|---|
+| `A_` 접두사 | 애니메이션 시퀀스. 외부 팩은 출처를 붙인다 (`A_UAL2_Sword_Regular_A`) |
+| `AM_` 접두사 | 애니메이션 몽타주 |
+| `IK_`, `RTG_` 접두사 | IK Rig, IK Retargeter (`IK_UAL2`, `IK_Manny`, `RTG_UAL2_Manny`) |
 | `weapon_r` (캐릭터 `hand_r` 본에 추가) | 검 부착 위치 |
 | `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
 | `Window.Combo`, `Window.Cancel`, `State.Invulnerable` | `ANS_TagWindow`가 붙이는 태그 |
@@ -304,8 +307,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 0-3: `Docs/PLAN.md` 배치, 첫 커밋 (2026-11-15)
 - [x] Step 0-4: 템플릿 Combat 변형 파일별 판정, `Docs/TemplateReview.md` (2026-11-15)
 
+- [x] Step 0-5 (UAL2 쪽): UAL2 Standard RM glb 임포트, 자동 IK Retargeter로 Manny에 `Sword_Regular_A`, `Sword_Dash` 리타깃, 루트 모션 유지 확인. 출처와 라이선스는 `Docs/Credits.md` (2026-11-15)
+
 ### 현재 위치
-- **Step 0-5** 시작 전: 리타깃 검증 (Quaternius UAL2 → `Portfolio/`, Fab 후보 → `ThirdParty/`)
+- **Step 0-5** 진행 중: Fab 후보 리타깃 검증 남음 (→ `ThirdParty/`). 그 전에 기본 세트의 빈 곳(회피, 방향별 피격)을 어떻게 채울지 결정 필요
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -319,3 +324,4 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-14: 폴리싱 우선순위는 공격 최우선, 방어 3종은 동작하고 구분되는 수준까지
 - 2026-11-14: 템플릿 재사용 범위. 전투 코어(공격, 판정, 타격 해석, 반응, 방어)는 새로 설계하고, 코어 바깥(적 이동과 배회, 스포너, 체크포인트, UI)은 템플릿 Combat 변형을 고쳐 쓴다. 근거: 템플릿은 공격 값이 캐릭터당 하나이고 질량 개념이 없어 DMC식 간격 손맛을 표현할 수 없다. 파일 단위 판정은 `Docs/TemplateReview.md`
 - 2026-11-15: 적이 플레이어 공격 예고를 보고 회피하는 반응(템플릿 `NotifyDanger` → `IsInDanger` → `EnvQuery_Evade`)은 제외. PLAN 3.5 범위 밖에 추가
+- 2026-11-15: 깃 버전 검 애니메이션은 Quaternius UAL2 Standard(CC0)의 루트 모션 버전. 모션 워핑(6-2)이 루트 모션을 전제하므로 제자리 버전은 쓰지 않는다. 회피와 방향별 피격은 무료 범위에 없음 (PLAN 5.3)
