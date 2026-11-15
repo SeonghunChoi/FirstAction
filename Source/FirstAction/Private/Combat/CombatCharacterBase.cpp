@@ -50,9 +50,20 @@ void ACombatCharacterBase::AbilityInputTagPressed(FGameplayTag InputTag)
 	}
 
 	// 목록을 도는 중에 활성화하면 목록이 바뀔 수 있으므로, 핸들을 모은 뒤 따로 활성화한다
+	bool bActivatedNew = false;
 	for (const FGameplayAbilitySpecHandle& Handle : HandlesToActivate)
 	{
-		AbilitySystemComponent->TryActivateAbility(Handle);
+		if (AbilitySystemComponent->TryActivateAbility(Handle))
+		{
+			bActivatedNew = true;
+		}
+	}
+
+	// 새 어빌리티를 시작한 입력은 이미 쓰였으므로 보관하지 않는다.
+	// 막혔거나(공격 중 강공격), 실행 중인 어빌리티에 전달만 된 입력은 나중에 꺼내 쓸 수 있게 보관한다
+	if (!bActivatedNew)
+	{
+		BufferInput(InputTag);
 	}
 
 	if (!bFound)
@@ -75,6 +86,47 @@ void ACombatCharacterBase::AbilityInputTagReleased(FGameplayTag InputTag)
 			AbilitySystemComponent->AbilitySpecInputReleased(Spec);
 		}
 	}
+}
+
+void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
+{
+	if (InputBufferDuration <= 0.f || !GetWorld())
+	{
+		return;
+	}
+
+	BufferedInput.InputTag = InputTag;
+	BufferedInput.PressedTime = GetWorld()->GetTimeSeconds();
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 버퍼 기록: %s"), *GetName(), *InputTag.ToString());
+}
+
+bool ACombatCharacterBase::ConsumeBufferedInput(const FGameplayTagContainer& AcceptedInputTags, FGameplayTag& OutInputTag)
+{
+	if (!BufferedInput.InputTag.IsValid() || !GetWorld())
+	{
+		return false;
+	}
+
+	// 보관 시간이 지난 입력은 버린다
+	const double Age = GetWorld()->GetTimeSeconds() - BufferedInput.PressedTime;
+	if (Age > InputBufferDuration)
+	{
+		BufferedInput = FCombatBufferedInput();
+		return false;
+	}
+
+	// 이 소비자가 받지 않는 입력은 남겨 둔다
+	if (!AcceptedInputTags.HasTagExact(BufferedInput.InputTag))
+	{
+		return false;
+	}
+
+	OutInputTag = BufferedInput.InputTag;
+	BufferedInput = FCombatBufferedInput();
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 버퍼 소비: %s (%.2f초 전 입력)"), *GetName(), *OutInputTag.ToString(), Age);
+	return true;
 }
 
 void ACombatCharacterBase::BeginPlay()

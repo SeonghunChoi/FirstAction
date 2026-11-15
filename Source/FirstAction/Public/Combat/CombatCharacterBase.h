@@ -35,6 +35,20 @@ struct FCombatAbilityGrant
 	TObjectPtr<UPrimaryDataAsset> AbilityData;
 };
 
+// 입력 버퍼에 보관 중인 입력 하나 (Step 4-2)
+USTRUCT(BlueprintType)
+struct FCombatBufferedInput
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Input")
+	FGameplayTag InputTag;
+
+	// 누른 시각 (월드 시간, 초)
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Input")
+	double PressedTime = 0.0;
+};
+
 UCLASS(Abstract)
 class FIRSTACTION_API ACombatCharacterBase : public ACharacter, public IAbilitySystemInterface
 {
@@ -54,6 +68,11 @@ public:
 	void AbilityInputTagPressed(FGameplayTag InputTag);
 	void AbilityInputTagReleased(FGameplayTag InputTag);
 
+	// 입력 버퍼에서 받아들일 수 있는 입력을 꺼낸다 (Step 4-2)
+	// 보관 시간 안에 들어왔고 AcceptedInputTags 중 하나이면 OutInputTag에 담고 버퍼를 비운 뒤 true.
+	// 받아들일 수 없는 입력(예: 공격 콤보 구간에서의 회피 입력)은 다른 소비자를 위해 버퍼에 남긴다
+	bool ConsumeBufferedInput(const FGameplayTagContainer& AcceptedInputTags, FGameplayTag& OutInputTag);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override;
@@ -66,8 +85,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Startup")
 	TArray<TSubclassOf<UGameplayEffect>> StartupEffects;
 
+	// 입력 버퍼 보관 시간(초). 이보다 오래된 입력은 버린다. 0이면 버퍼를 쓰지 않는다
+	// 튜닝값이므로 C++ 기본값은 0이고, 블루프린트 기본값에서 정한다(설계 규칙 3)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Input", meta = (ClampMin = "0.0", Units = "s"))
+	float InputBufferDuration = 0.f;
+
 private:
 	void GrantStartupAbilitiesAndEffects();
+
+	// 새 어빌리티를 시작하지 못한 입력을 기록한다. 가장 최근 입력 하나만 남긴다
+	void BufferInput(const FGameplayTag& InputTag);
+
+	// 실행 중 상태값: 디버깅용으로 보기만 (설계 규칙 9)
+	UPROPERTY(VisibleInstanceOnly, Category = "Combat|Input")
+	FCombatBufferedInput BufferedInput;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
