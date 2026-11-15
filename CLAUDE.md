@@ -131,7 +131,7 @@
 2. `Content/ThirdParty/`는 `.gitignore` 대상이다. 유료 원본, 이를 참조하는 몽타주, Release 콘텐츠 세트가 모두 여기에 있다.
 3. 모든 애니메이션은 **UE5 마네킹 스켈레톤 기준**. 유료 애니메이션은 IK Retargeter로 리타깃한다.
 4. **소켓과 노티파이 이름 규약**을 지킨다. 새 이름을 만들면 6.1 표에 추가한다.
-5. 기본 세트의 공격/피격 애니메이션은 **CC0 에셋만** 쓴다 (후보: Quaternius UAL2, 검 메시는 LowPoly Medieval Weapons). Fab 무료 에셋과 Mixamo는 깃에 넣지 않는다.
+5. 기본 세트의 애니메이션은 **무료이면서 공개 저장소에 원본 재배포가 허용된 것만** 쓴다. 즉 CC0 에셋(Quaternius UAL2/UAL1 무료판, 검 메시는 LowPoly Medieval Weapons)이거나, 약관이 재배포를 허용하는 AI 생성물(Uthana 무료, 출처 표기 조건)이다. 모든 외부 출처는 `Docs/Credits.md`에 적는다. Fab 무료 에셋, Epic 샘플(GASP, Lyra), Mixamo는 깃에 넣지 않는다.
 6. Release 세트 선택은 `UPortfolioContentSettings`가 하고, 로드 실패 시 Default로 폴백한다.
 
 ### 5.1 소켓 / 노티파이 / 에셋 이름 규약 (초안, 스텝 진행 중 확정)
@@ -308,9 +308,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 0-4: 템플릿 Combat 변형 파일별 판정, `Docs/TemplateReview.md` (2026-11-15)
 
 - [x] Step 0-5 (UAL2 쪽): UAL2 Standard RM glb 임포트, 자동 IK Retargeter로 Manny에 `Sword_Regular_A`, `Sword_Dash` 리타깃, 루트 모션 유지 확인. 출처와 라이선스는 `Docs/Credits.md` (2026-11-15)
+- [x] Step 0-5 (UAL1 쪽): UAL1 Standard RM glb 임포트, `Roll`을 Manny에 리타깃, 루트 모션 유지 확인. `Hit_Head`, `Hit_Chest`는 같은 `RTG_UAL1_Manny`로 6-7에서 리타깃 (2026-11-15)
 
 ### 현재 위치
-- **Step 0-5** 진행 중: Fab 후보 리타깃 검증 남음 (→ `ThirdParty/`). 그 전에 기본 세트의 빈 곳(회피, 방향별 피격)을 어떻게 채울지 결정 필요
+- **Step 0-5** 진행 중. 남은 순서: Uthana로 회피 1개 시험 생성·리타깃 → Fab 후보 리타깃 (→ `ThirdParty/`)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -325,3 +326,6 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-14: 템플릿 재사용 범위. 전투 코어(공격, 판정, 타격 해석, 반응, 방어)는 새로 설계하고, 코어 바깥(적 이동과 배회, 스포너, 체크포인트, UI)은 템플릿 Combat 변형을 고쳐 쓴다. 근거: 템플릿은 공격 값이 캐릭터당 하나이고 질량 개념이 없어 DMC식 간격 손맛을 표현할 수 없다. 파일 단위 판정은 `Docs/TemplateReview.md`
 - 2026-11-15: 적이 플레이어 공격 예고를 보고 회피하는 반응(템플릿 `NotifyDanger` → `IsInDanger` → `EnvQuery_Evade`)은 제외. PLAN 3.5 범위 밖에 추가
 - 2026-11-15: 깃 버전 검 애니메이션은 Quaternius UAL2 Standard(CC0)의 루트 모션 버전. 모션 워핑(6-2)이 루트 모션을 전제하므로 제자리 버전은 쓰지 않는다. 회피와 방향별 피격은 무료 범위에 없음 (PLAN 5.3)
+- 2026-11-15: 깃 버전의 회피와 피격 반응도 보기에 자연스러워야 한다 (규칙 동작 확인만으로는 부족). 빈 곳을 채울 출처는 조사 후 결정
+- 2026-11-15: 회피·피격 애니메이션의 동작 질감이 공격(UAL2)과 달라도 된다. 후보는 Quaternius UAL1(CC0)과 Uthana(AI 생성). 조사 결과는 PLAN 9장 표
+- 2026-11-15: 깃 기본 세트 애니메이션은 무료로만. UAL1 무료판(구르기, 머리·가슴 피격)을 먼저 쓰고, 나머지(좌우 회피, 측면·후면 피격, 백스텝)는 Uthana 무료(출처 표기)로 생성. 에셋 규칙 5항을 "무료 + 재배포 허용"으로 변경
