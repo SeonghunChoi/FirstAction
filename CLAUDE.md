@@ -131,7 +131,7 @@
 2. `Content/ThirdParty/`는 `.gitignore` 대상이다. 유료 원본, 이를 참조하는 몽타주, Release 콘텐츠 세트가 모두 여기에 있다.
 3. 모든 애니메이션은 **UE5 마네킹 스켈레톤 기준**. 유료 애니메이션은 IK Retargeter로 리타깃한다.
 4. **소켓과 노티파이 이름 규약**을 지킨다. 새 이름을 만들면 6.1 표에 추가한다.
-5. 기본 세트의 애니메이션은 **무료이면서 공개 저장소에 원본 재배포가 허용된 것만** 쓴다. 즉 CC0 에셋(Quaternius UAL2/UAL1 무료판, 검 메시는 LowPoly Medieval Weapons)이거나, 약관이 재배포를 허용하는 AI 생성물(Uthana 무료, 출처 표기 조건)이다. 모든 외부 출처는 `Docs/Credits.md`에 적는다. Fab 무료 에셋, Epic 샘플(GASP, Lyra), Mixamo는 깃에 넣지 않는다.
+5. 기본 세트의 애니메이션은 **무료이면서 공개 저장소에 원본 재배포가 허용된 것만** 쓴다. 현재는 CC0 에셋(Quaternius UAL2/UAL1 무료판, 검 메시는 LowPoly Medieval Weapons)만 쓴다. 깃 버전은 기능이 동작하는 것을 보여 주는 수준이고, 자연스러운 동작은 배포 빌드에서 보여 준다. 모든 외부 출처는 `Docs/Credits.md`에 적는다. Fab 무료 에셋, Epic 샘플(GASP, Lyra), Mixamo는 깃에 넣지 않는다.
 6. Release 세트 선택은 `UPortfolioContentSettings`가 하고, 로드 실패 시 Default로 폴백한다.
 
 ### 5.1 소켓 / 노티파이 / 에셋 이름 규약 (초안, 스텝 진행 중 확정)
@@ -200,7 +200,7 @@ Content/
 - 0-2. `git init`, Git LFS(`*.uasset`, `*.umap`), 언리얼용 `.gitignore` + `Content/ThirdParty/`
 - 0-3. `Docs/PLAN.md`, 이 파일 배치, 첫 커밋
 - 0-4. 참고 프로젝트의 전투 구현을 함께 훑어보고, 무엇을 새로 설계할지 사용자와 정리 (PDF 비교 페이지 소재)
-- 0-5. **리타깃 검증**: Quaternius UAL2 검 애니메이션 하나(→ `Portfolio/`), Fab 후보 하나(→ `ThirdParty/`)를 마네킹에 리타깃해 재생 확인
+- 0-5. **리타깃 검증**: Quaternius UAL2 검 애니메이션 하나(→ `Portfolio/`)를 마네킹에 리타깃해 재생 확인. Fab 후보 검증은 9-3으로 미룸
 - ✅ 마일스톤: 클론 → 열기 → 실행이 되는 빈 저장소, 리타깃 가능성 확인
 
 ### Step 1. GAS 뼈대
@@ -274,7 +274,7 @@ Content/
 ### Step 9. 콘텐츠 세트와 배포 빌드
 - 9-1. `UCombatContentSet`, `UPortfolioContentSettings`, 폴백
 - 9-2. Asset Manager 기본 에셋 타입 등록
-- 9-3. 유료 에셋으로 Release 세트 구성 (`ThirdParty/`)
+- 9-3. 유료 에셋 선정과 리타깃 검증(0-5에서 이연), Release 세트 구성 (`ThirdParty/`)
 - 9-4. RunUAT BuildCookRun 스크립트: 기본 빌드 / 배포 빌드
 - ✅ 마일스톤: 같은 소스에서 두 빌드가 나오고, ThirdParty 없는 클론에서도 기본 빌드가 실행된다
 
@@ -310,8 +310,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 0-5 (UAL2 쪽): UAL2 Standard RM glb 임포트, 자동 IK Retargeter로 Manny에 `Sword_Regular_A`, `Sword_Dash` 리타깃, 루트 모션 유지 확인. 출처와 라이선스는 `Docs/Credits.md` (2026-11-15)
 - [x] Step 0-5 (UAL1 쪽): UAL1 Standard RM glb 임포트, `Roll`을 Manny에 리타깃, 루트 모션 유지 확인. `Hit_Head`, `Hit_Chest`는 같은 `RTG_UAL1_Manny`로 6-7에서 리타깃 (2026-11-15)
 
+- [x] Step 0-5 마무리: Uthana 시험 중단, Fab 후보 검증은 9-3으로 이연 (2026-11-15)
+
 ### 현재 위치
-- **Step 0-5** 진행 중. 남은 순서: Uthana로 회피 1개 시험 생성·리타깃 → Fab 후보 리타깃 (→ `ThirdParty/`)
+- **Step 0 마일스톤** 확인 전: 클론 → 열기 → 실행 (원격 저장소 미연결)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -329,3 +331,5 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: 깃 버전의 회피와 피격 반응도 보기에 자연스러워야 한다 (규칙 동작 확인만으로는 부족). 빈 곳을 채울 출처는 조사 후 결정
 - 2026-11-15: 회피·피격 애니메이션의 동작 질감이 공격(UAL2)과 달라도 된다. 후보는 Quaternius UAL1(CC0)과 Uthana(AI 생성). 조사 결과는 PLAN 9장 표
 - 2026-11-15: 깃 기본 세트 애니메이션은 무료로만. UAL1 무료판(구르기, 머리·가슴 피격)을 먼저 쓰고, 나머지(좌우 회피, 측면·후면 피격, 백스텝)는 Uthana 무료(출처 표기)로 생성. 에셋 규칙 5항을 "무료 + 재배포 허용"으로 변경
+- 2026-11-15: **결정 변경**. 깃 버전 회피·피격은 "보기에 자연스러움"을 포기하고 기능 구현 수준으로 한다. Uthana 시험에서 아마추어 축척(0.0116)과 `root` 본 부재로 임포트·리타깃이 막혀 에셋 작업에 시간이 과하게 들었기 때문. 회피는 UAL1 `Roll`을 입력 방향으로 돌려 쓰고, 피격은 UAL1 `Hit_Head`/`Hit_Chest`, UAL2 `Hit_Knockback`과 부위 물리 반응(6-8)으로 방향을 구분한다. Uthana는 쓰지 않는다
+- 2026-11-15: Fab 후보 리타깃 검증은 9-3(유료 에셋 선정 시점)으로 미룬다. 유료 에셋이 미정이고, 후보 팩이 UE5 마네킹 기반이라 리타깃 위험이 낮다
