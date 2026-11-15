@@ -170,6 +170,8 @@ Source/FirstAction/
 │   │   └── Animation/
 │   │       ├── ANS_TagWindow.h
 │   │       └── ANS_HitWindow.h
+│   ├── Input/
+│   │   └── CombatInputConfig.h        // 입력 액션 → 입력 태그
 │   ├── AI/
 │   │   ├── EnemyPatternDataAsset.h
 │   │   ├── CombatTokenSubsystem.h
@@ -325,8 +327,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 1-5: `AFirstActionCharacter`의 부모를 `ACombatCharacterBase`로 변경, `Portfolio/Data/Effects/GE_InitAttributes`(Instant, Override, 최대값 먼저)를 `BP_ThirdPersonCharacter`의 `Startup Effects`에 지정 (2026-11-15)
 - [x] ✅ Step 1 마일스톤: `showdebug abilitysystem`에 `Health`/`MaxHealth`/`Poise`/`MaxPoise` 100 표시 (2026-11-15)
 
+- [x] Step 2-1: `UCombatInputConfig`(입력 액션 → `InputTag`), `Portfolio/Input/`에 `IA_LightAttack`/`IA_HeavyAttack`/`IA_Dodge`/`IA_Guard`, `IMC_Combat`(Default Key Mappings, 패드 X/Y/B/RB + 키보드), `DA_CombatInputConfig`, `BP_ThirdPersonPlayerController`에 `IMC_Combat` 등록 (2026-11-15)
+
 ### 현재 위치
-- **Step 2-1** 시작 전: Enhanced Input 액션과 입력 태그 매핑 데이터 (게임패드 기준)
+- **Step 2-2** 시작 전: 입력 태그로 어빌리티를 찾아 활성화하는 경로
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
