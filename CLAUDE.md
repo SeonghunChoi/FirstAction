@@ -335,8 +335,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 2-3: `UGA_DebugLog`(InstancedPerActor, 스펙 입력 태그를 로그와 화면에 출력). `BP_ThirdPersonCharacter`에 `{GA_DebugLog, LightAttack}`, `{GA_DebugLog, HeavyAttack}` 부여 (2026-11-15)
 - [x] ✅ Step 2 마일스톤: 패드 X/Y → 같은 `GA_DebugLog`가 각각 `InputTag.LightAttack`/`InputTag.HeavyAttack`으로 활성화 로그 (2026-11-15)
 
+- [x] Step 3-1: `UAttackDataAsset : UPrimaryDataAsset`(현재 칸: `Montage`), `Portfolio/Data/Attacks/DA_Attack_Light_01`(임시 `AM_ComboAttack`), `DA_Attack_Heavy_01`(임시 `AM_ChargedAttack`) (2026-11-16)
+
 ### 현재 위치
-- **Step 3-1** 시작 전: `UAttackDataAsset`
+- **Step 3-2** 시작 전: `GA_MeleeAttack` (공격 데이터를 받아 `PlayMontageAndWait`)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -358,5 +360,6 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: ASC는 캐릭터에 붙인다. 리스폰(템플릿 방식, 폰 재생성) 때 어빌리티 상태가 이어질 필요가 없다
 - 2026-11-15: 플레이어 클래스는 템플릿 `AFirstActionCharacter`를 고쳐 쓴다. 부모만 `ACharacter` → `ACombatCharacterBase`로 바꾸고, `BP_ThirdPersonCharacter`는 그대로 쓴다. 플레이어 전용 코드(입력 → 어빌리티, 락온)는 이 클래스에 추가한다
 - 2026-11-15: 어빌리티와 입력 태그의 짝은 부여 목록(`{어빌리티, 입력 태그}`)에 둔다. 같은 `GA_MeleeAttack`을 약공격·강공격 두 입력에 묶어야 하기 때문
+- 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
 - 2026-11-15: 저장소는 공개로 만든다. 공개 전에 이력에서 지원 회사 언급을 지우고, 커밋 이메일은 GitHub noreply로 바꿨다. 앞으로도 저장소에 회사·공고 이름을 쓰지 않는다
 - 2026-11-15: Fab 후보 리타깃 검증은 9-3(유료 에셋 선정 시점)으로 미룬다. 유료 에셋이 미정이고, 후보 팩이 UE5 마네킹 기반이라 리타깃 위험이 낮다
