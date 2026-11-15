@@ -339,8 +339,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 3-2: `UGA_MeleeAttack`(SourceObject의 공격 데이터 → `PlayMontageAndWait`, `State.Attacking` Owned/Blocked), 부여 목록에 `AbilityData` 추가. X/Y가 각각 다른 데이터로 몽타주 재생 확인. 임시 `AM_ChargedAttack`은 차지 구간이 무한 반복이라 어빌리티가 끝나지 않음(템플릿은 코드로 구간을 넘김) → 3-3에서 교체 (2026-11-16)
 
+- [x] Step 3-3 (1/2 몽타주): `A_UAL2_Sword_Heavy_Combo` 리타깃(`RTG_UAL2_Manny` 재사용), `Portfolio/Animations/Montages/AM_UAL2_Sword_Regular_A`, `AM_UAL2_Sword_Heavy_Combo`(DefaultSlot, 루트 모션), 공격 데이터 두 장을 교체. C++ 변경 없이 공격이 바뀜 (2026-11-16)
+- [x] ✅ Step 3 마일스톤: X/Y로 데이터에 지정된 UAL2 검 몽타주 재생, 둘 다 완료 종료 (2026-11-16)
+
 ### 현재 위치
-- **Step 3-3** 시작 전: UAL2 검 애니메이션으로 몽타주 생성, 검 메시와 `blade_start`/`blade_end` 소켓
+- **Step 3-3 (2/2)** 시작 전: 검 메시, `hand_r`의 `weapon_r` 소켓, 검 메시의 `blade_start`/`blade_end` 소켓. 검 출처 결정 필요
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
