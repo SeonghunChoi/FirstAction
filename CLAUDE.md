@@ -329,8 +329,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 2-1: `UCombatInputConfig`(입력 액션 → `InputTag`), `Portfolio/Input/`에 `IA_LightAttack`/`IA_HeavyAttack`/`IA_Dodge`/`IA_Guard`, `IMC_Combat`(Default Key Mappings, 패드 X/Y/B/RB + 키보드), `DA_CombatInputConfig`, `BP_ThirdPersonPlayerController`에 `IMC_Combat` 등록 (2026-11-15)
 
+- [x] Step 2-2: `FCombatAbilityGrant {Ability, InputTag}`로 시작 어빌리티 목록 변경(입력 태그는 스펙 동적 태그), `ACombatCharacterBase::AbilityInputTagPressed/Released`, `AFirstActionCharacter`가 `DA_CombatInputConfig`로 Started/Completed 바인딩. 네 버튼 모두 "연결된 어빌리티 없음" 로그 1회 확인 (2026-11-15)
+
 ### 현재 위치
-- **Step 2-2** 시작 전: 입력 태그로 어빌리티를 찾아 활성화하는 경로
+- **Step 2-3** 시작 전: 로그만 찍는 테스트 어빌리티
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -351,5 +353,6 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: **결정 변경**. 깃 버전 회피·피격은 "보기에 자연스러움"을 포기하고 기능 구현 수준으로 한다. Uthana 시험에서 아마추어 축척(0.0116)과 `root` 본 부재로 임포트·리타깃이 막혀 에셋 작업에 시간이 과하게 들었기 때문. 회피는 UAL1 `Roll`을 입력 방향으로 돌려 쓰고, 피격은 UAL1 `Hit_Head`/`Hit_Chest`, UAL2 `Hit_Knockback`과 부위 물리 반응(6-8)으로 방향을 구분한다. Uthana는 쓰지 않는다
 - 2026-11-15: ASC는 캐릭터에 붙인다. 리스폰(템플릿 방식, 폰 재생성) 때 어빌리티 상태가 이어질 필요가 없다
 - 2026-11-15: 플레이어 클래스는 템플릿 `AFirstActionCharacter`를 고쳐 쓴다. 부모만 `ACharacter` → `ACombatCharacterBase`로 바꾸고, `BP_ThirdPersonCharacter`는 그대로 쓴다. 플레이어 전용 코드(입력 → 어빌리티, 락온)는 이 클래스에 추가한다
+- 2026-11-15: 어빌리티와 입력 태그의 짝은 부여 목록(`{어빌리티, 입력 태그}`)에 둔다. 같은 `GA_MeleeAttack`을 약공격·강공격 두 입력에 묶어야 하기 때문
 - 2026-11-15: 저장소는 공개로 만든다. 공개 전에 이력에서 지원 회사 언급을 지우고, 커밋 이메일은 GitHub noreply로 바꿨다. 앞으로도 저장소에 회사·공고 이름을 쓰지 않는다
 - 2026-11-15: Fab 후보 리타깃 검증은 9-3(유료 에셋 선정 시점)으로 미룬다. 유료 에셋이 미정이고, 후보 팩이 UE5 마네킹 기반이라 리타깃 위험이 낮다

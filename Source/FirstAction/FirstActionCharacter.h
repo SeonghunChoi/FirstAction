@@ -10,6 +10,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UCombatInputConfig;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -50,6 +51,10 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
+
+	// FirstAction: 전투 입력 액션 → 입력 태그 표 (Step 2-2). 눌림/뗌을 입력 태그로 바꿔 ASC에 요청한다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Combat")
+	TObjectPtr<UCombatInputConfig> CombatInputConfig;
 
 public:
 

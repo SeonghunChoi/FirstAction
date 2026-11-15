@@ -4,6 +4,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "GameplayEffect.h"
 #include "Combat/CombatAttributeSet.h"
+#include "FirstAction.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
 {
@@ -16,6 +17,63 @@ ACombatCharacterBase::ACombatCharacterBase()
 UAbilitySystemComponent* ACombatCharacterBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+void ACombatCharacterBase::AbilityInputTagPressed(FGameplayTag InputTag)
+{
+	if (!InputTag.IsValid())
+	{
+		return;
+	}
+
+	bool bFound = false;
+	TArray<FGameplayAbilitySpecHandle, TInlineAllocator<4>> HandlesToActivate;
+
+	for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		if (!Spec.Ability || !Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
+		{
+			continue;
+		}
+
+		bFound = true;
+		if (Spec.IsActive())
+		{
+			// 이미 실행 중이면 입력이 들어왔다는 사실만 알린다 (콤보 입력은 Step 4에서 사용)
+			AbilitySystemComponent->AbilitySpecInputPressed(Spec);
+		}
+		else
+		{
+			HandlesToActivate.Add(Spec.Handle);
+		}
+	}
+
+	// 목록을 도는 중에 활성화하면 목록이 바뀔 수 있으므로, 핸들을 모은 뒤 따로 활성화한다
+	for (const FGameplayAbilitySpecHandle& Handle : HandlesToActivate)
+	{
+		AbilitySystemComponent->TryActivateAbility(Handle);
+	}
+
+	if (!bFound)
+	{
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 태그 %s에 연결된 어빌리티가 없습니다"), *GetName(), *InputTag.ToString());
+	}
+}
+
+void ACombatCharacterBase::AbilityInputTagReleased(FGameplayTag InputTag)
+{
+	if (!InputTag.IsValid())
+	{
+		return;
+	}
+
+	for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		if (Spec.Ability && Spec.IsActive() && Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
+		{
+			AbilitySystemComponent->AbilitySpecInputReleased(Spec);
+		}
+	}
 }
 
 void ACombatCharacterBase::BeginPlay()
@@ -43,12 +101,20 @@ void ACombatCharacterBase::GrantStartupAbilitiesAndEffects()
 	}
 	bStartupGranted = true;
 
-	for (const TSubclassOf<UGameplayAbility>& AbilityClass : StartupAbilities)
+	for (const FCombatAbilityGrant& Grant : StartupAbilities)
 	{
-		if (AbilityClass)
+		if (!Grant.Ability)
 		{
-			AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, INDEX_NONE, this));
+			continue;
 		}
+
+		FGameplayAbilitySpec Spec(Grant.Ability, 1, INDEX_NONE, this);
+		if (Grant.InputTag.IsValid())
+		{
+			// 입력 태그는 클래스가 아니라 이 부여 건(스펙)에 붙인다. 같은 클래스를 다른 태그로 또 부여할 수 있다
+			Spec.GetDynamicSpecSourceTags().AddTag(Grant.InputTag);
+		}
+		AbilitySystemComponent->GiveAbility(Spec);
 	}
 
 	FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();

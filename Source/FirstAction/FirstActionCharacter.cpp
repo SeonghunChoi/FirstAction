@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "FirstAction.h"
+#include "Input/CombatInputConfig.h"
 
 AFirstActionCharacter::AFirstActionCharacter()
 {
@@ -65,6 +66,24 @@ void AFirstActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFirstActionCharacter::Look);
+
+		// FirstAction: 전투 입력. 입력 액션마다 자기 입력 태그를 함께 넘기도록 바인딩한다 (Step 2-2)
+		if (CombatInputConfig)
+		{
+			for (const FCombatInputAction& Entry : CombatInputConfig->AbilityInputActions)
+			{
+				if (Entry.InputAction && Entry.InputTag.IsValid())
+				{
+					// Started: 누른 순간 한 번, Completed: 뗀 순간 한 번
+					EnhancedInputComponent->BindAction(Entry.InputAction, ETriggerEvent::Started, this, &ACombatCharacterBase::AbilityInputTagPressed, Entry.InputTag);
+					EnhancedInputComponent->BindAction(Entry.InputAction, ETriggerEvent::Completed, this, &ACombatCharacterBase::AbilityInputTagReleased, Entry.InputTag);
+				}
+			}
+		}
+		else
+		{
+			UE_LOG(LogFirstAction, Warning, TEXT("'%s' CombatInputConfig가 지정되지 않아 전투 입력을 바인딩하지 않았습니다."), *GetNameSafe(this));
+		}
 	}
 	else
 	{
