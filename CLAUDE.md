@@ -131,7 +131,7 @@
 2. `Content/ThirdParty/`는 `.gitignore` 대상이다. 유료 원본, 이를 참조하는 몽타주, Release 콘텐츠 세트가 모두 여기에 있다.
 3. 모든 애니메이션은 **UE5 마네킹 스켈레톤 기준**. 유료 애니메이션은 IK Retargeter로 리타깃한다.
 4. **소켓과 노티파이 이름 규약**을 지킨다. 새 이름을 만들면 6.1 표에 추가한다.
-5. 기본 세트의 애니메이션은 **무료이면서 공개 저장소에 원본 재배포가 허용된 것만** 쓴다. 현재는 CC0 에셋(Quaternius UAL2/UAL1 무료판, 검 메시는 LowPoly Medieval Weapons)만 쓴다. 깃 버전은 기능이 동작하는 것을 보여 주는 수준이고, 자연스러운 동작은 배포 빌드에서 보여 준다. 모든 외부 출처는 `Docs/Credits.md`에 적는다. Fab 무료 에셋, Epic 샘플(GASP, Lyra), Mixamo는 깃에 넣지 않는다.
+5. 기본 세트의 애니메이션은 **무료이면서 공개 저장소에 원본 재배포가 허용된 것만** 쓴다. 현재는 CC0 에셋(Quaternius UAL2/UAL1 무료판)만 쓰고, 검 메시는 에디터에서 직접 만든 임시 메시를 쓴다. 깃 버전은 기능이 동작하는 것을 보여 주는 수준이고, 자연스러운 동작은 배포 빌드에서 보여 준다. 모든 외부 출처는 `Docs/Credits.md`에 적는다. Fab 무료 에셋, Epic 샘플(GASP, Lyra), Mixamo는 깃에 넣지 않는다.
 6. Release 세트 선택은 `UPortfolioContentSettings`가 하고, 로드 실패 시 Default로 폴백한다.
 
 ### 5.1 소켓 / 노티파이 / 에셋 이름 규약 (초안, 스텝 진행 중 확정)
@@ -141,7 +141,7 @@
 | `A_` 접두사 | 애니메이션 시퀀스. 외부 팩은 출처를 붙인다 (`A_UAL2_Sword_Regular_A`) |
 | `AM_` 접두사 | 애니메이션 몽타주 |
 | `IK_`, `RTG_` 접두사 | IK Rig, IK Retargeter (`IK_UAL2`, `IK_Manny`, `RTG_UAL2_Manny`) |
-| `weapon_r` (캐릭터 `hand_r` 본에 추가) | 검 부착 위치 |
+| `HandGrip_R` (마네킹 스켈레톤에 원래 있는 소켓) | 검 부착 위치. `weapon_r`은 마네킹에 이미 같은 이름이 있고 손을 따라 움직이지 않아 쓰지 않는다 |
 | `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
 | `Window.Combo`, `Window.Cancel`, `State.Invulnerable` | `ANS_TagWindow`가 붙이는 태그 |
 
@@ -342,8 +342,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 3-3 (1/2 몽타주): `A_UAL2_Sword_Heavy_Combo` 리타깃(`RTG_UAL2_Manny` 재사용), `Portfolio/Animations/Montages/AM_UAL2_Sword_Regular_A`, `AM_UAL2_Sword_Heavy_Combo`(DefaultSlot, 루트 모션), 공격 데이터 두 장을 교체. C++ 변경 없이 공격이 바뀜 (2026-11-16)
 - [x] ✅ Step 3 마일스톤: X/Y로 데이터에 지정된 UAL2 검 몽타주 재생, 둘 다 완료 종료 (2026-11-16)
 
+- [x] Step 3-3 (2/2 검): Modeling Tools로 `Portfolio/Weapons/SM_Sword_Placeholder`(소켓 `blade_start`, `blade_end`), `BP_ThirdPersonCharacter`에 `Weapon` 스태틱 메시 컴포넌트(부모 소켓 `HandGrip_R`, NoCollision) (2026-11-16)
+
 ### 현재 위치
-- **Step 3-3 (2/2)** 시작 전: 검 메시, `hand_r`의 `weapon_r` 소켓, 검 메시의 `blade_start`/`blade_end` 소켓. 검 출처 결정 필요
+- **Step 4-1** 시작 전: `ANS_TagWindow` (구간 동안 태그 부착/제거)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -366,6 +368,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: 플레이어 클래스는 템플릿 `AFirstActionCharacter`를 고쳐 쓴다. 부모만 `ACharacter` → `ACombatCharacterBase`로 바꾸고, `BP_ThirdPersonCharacter`는 그대로 쓴다. 플레이어 전용 코드(입력 → 어빌리티, 락온)는 이 클래스에 추가한다
 - 2026-11-15: 어빌리티와 입력 태그의 짝은 부여 목록(`{어빌리티, 입력 태그}`)에 둔다. 같은 `GA_MeleeAttack`을 약공격·강공격 두 입력에 묶어야 하기 때문
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
+- 2026-11-16: 깃 버전 검 메시는 Modeling Tools로 만든 임시 검(`SM_Sword_Placeholder`). 기능 구현 수준 기준이고, 소켓 이름만 지키면 메시는 나중에 교체 가능
 - 2026-11-16: `GA_MeleeAttack`의 시작 공격 데이터는 플레이어는 부여 목록(스펙 SourceObject), AI는 공격 이벤트 페이로드로 넘긴다. 페이로드 우선. 페이로드 경로는 Step 7에서 추가
 - 2026-11-15: 저장소는 공개로 만든다. 공개 전에 이력에서 지원 회사 언급을 지우고, 커밋 이메일은 GitHub noreply로 바꿨다. 앞으로도 저장소에 회사·공고 이름을 쓰지 않는다
 - 2026-11-15: Fab 후보 리타깃 검증은 9-3(유료 에셋 선정 시점)으로 미룬다. 유료 에셋이 미정이고, 후보 팩이 UE5 마네킹 기반이라 리타깃 위험이 낮다
