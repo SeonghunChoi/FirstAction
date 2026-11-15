@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Character.h"
+#include "Combat/CombatCharacterBase.h"
 #include "Logging/LogMacros.h"
 #include "FirstActionCharacter.generated.h"
 
@@ -17,9 +17,11 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 /**
  *  A simple player-controllable third person character
  *  Implements a controllable orbiting camera
+ *
+ *  FirstAction: 플레이어 캐릭터. 전투 코어(ASC, 속성)는 ACombatCharacterBase에서 받는다. (Step 1-5)
  */
 UCLASS(abstract)
-class AFirstActionCharacter : public ACharacter
+class AFirstActionCharacter : public ACombatCharacterBase
 {
 	GENERATED_BODY()
 
