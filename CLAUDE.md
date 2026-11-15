@@ -163,6 +163,7 @@ Source/FirstAction/
 │   │   ├── MeleeTraceComponent.h
 │   │   ├── LockOnComponent.h
 │   │   ├── Abilities/
+│   │   │   ├── GA_DebugLog.h          // 연결 확인용 테스트 어빌리티
 │   │   │   ├── GA_MeleeAttack.h
 │   │   │   ├── GA_Dodge.h
 │   │   │   ├── GA_Guard.h
@@ -331,8 +332,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 2-2: `FCombatAbilityGrant {Ability, InputTag}`로 시작 어빌리티 목록 변경(입력 태그는 스펙 동적 태그), `ACombatCharacterBase::AbilityInputTagPressed/Released`, `AFirstActionCharacter`가 `DA_CombatInputConfig`로 Started/Completed 바인딩. 네 버튼 모두 "연결된 어빌리티 없음" 로그 1회 확인 (2026-11-15)
 
+- [x] Step 2-3: `UGA_DebugLog`(InstancedPerActor, 스펙 입력 태그를 로그와 화면에 출력). `BP_ThirdPersonCharacter`에 `{GA_DebugLog, LightAttack}`, `{GA_DebugLog, HeavyAttack}` 부여 (2026-11-15)
+- [x] ✅ Step 2 마일스톤: 패드 X/Y → 같은 `GA_DebugLog`가 각각 `InputTag.LightAttack`/`InputTag.HeavyAttack`으로 활성화 로그 (2026-11-15)
+
 ### 현재 위치
-- **Step 2-3** 시작 전: 로그만 찍는 테스트 어빌리티
+- **Step 3-1** 시작 전: `UAttackDataAsset`
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
