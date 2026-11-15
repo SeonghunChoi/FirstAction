@@ -344,8 +344,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 3-3 (2/2 검): Modeling Tools로 `Portfolio/Weapons/SM_Sword_Placeholder`(소켓 `blade_start`, `blade_end`), `BP_ThirdPersonCharacter`에 `Weapon` 스태틱 메시 컴포넌트(부모 소켓 `HandGrip_R`, NoCollision) (2026-11-16)
 
+- [x] Step 4-1: `UANS_TagWindow`(구간 동안 ASC Loose 태그 부착/제거, 트랙에 태그 이름 표시, `Tag`는 노티파이 인스턴스 편집을 위해 `EditAnywhere`). `AM_UAL2_Sword_Regular_A` 후반에 `Window.Combo` 구간, showdebug로 구간에서만 태그 확인 (2026-11-16)
+
 ### 현재 위치
-- **Step 4-1** 시작 전: `ANS_TagWindow` (구간 동안 태그 부착/제거)
+- **Step 4-2** 시작 전: 입력 버퍼 (보관 시간은 데이터값)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
