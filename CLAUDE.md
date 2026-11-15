@@ -314,8 +314,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] ✅ Step 0 마일스톤: 공개 저장소 https://github.com/SeonghunChoi/FirstAction 에 push(LFS 531개, 181MB), 새 폴더에 클론 → 명령줄 빌드 성공 → 에디터에서 Play와 리타깃 애니메이션 재생 확인 (2026-11-15)
 
+- [x] Step 1-1: `GameplayAbilities` 플러그인 활성화, `Build.cs`에 `GameplayAbilities`, `GameplayTags`, `GameplayTasks` (Public) 추가, Rider 빌드와 에디터 실행 확인 (2026-11-15)
+
 ### 현재 위치
-- **Step 1-1** 시작 전: 플러그인과 모듈 추가
+- **Step 1-2** 시작 전: `CombatTags.h` 네이티브 태그 정의
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)

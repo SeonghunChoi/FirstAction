@@ -18,7 +18,11 @@ public class FirstAction : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			// GAS (Step 1-1): 공개 헤더(CombatCharacterBase.h 등)에서 GAS 타입을 쓰므로 Public
+			"GameplayAbilities",
+			"GameplayTags",
+			"GameplayTasks"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
