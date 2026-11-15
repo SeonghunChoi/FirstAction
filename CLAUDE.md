@@ -316,8 +316,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 1-1: `GameplayAbilities` 플러그인 활성화, `Build.cs`에 `GameplayAbilities`, `GameplayTags`, `GameplayTasks` (Public) 추가, Rider 빌드와 에디터 실행 확인 (2026-11-15)
 
+- [x] Step 1-2: `Public/Combat/CombatTags.h`, `Private/Combat/CombatTags.cpp`에 네이티브 태그 22개(`InputTag`, `State`, `Window`, `Event`, `SetByCaller`) 정의, 프로젝트 세팅 태그 목록에서 확인 (2026-11-15)
+
 ### 현재 위치
-- **Step 1-2** 시작 전: `CombatTags.h` 네이티브 태그 정의
+- **Step 1-3** 시작 전: `UCombatAttributeSet` (`Health`, `MaxHealth`, `Poise`, `MaxPoise`)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
