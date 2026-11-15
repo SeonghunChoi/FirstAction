@@ -14,6 +14,7 @@ class UAbilitySystemComponent;
 class UCombatAttributeSet;
 class UGameplayAbility;
 class UGameplayEffect;
+class UPrimaryDataAsset;
 
 // 시작할 때 부여할 어빌리티 한 줄. 같은 어빌리티 클래스를 다른 입력 태그로 여러 번 부여할 수 있다.
 USTRUCT(BlueprintType)
@@ -27,6 +28,11 @@ struct FCombatAbilityGrant
 	// 이 어빌리티를 실행할 입력 태그. 입력 없이 이벤트로만 발동하는 어빌리티(피격 반응 등)는 비워 둔다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability", meta = (Categories = "InputTag"))
 	FGameplayTag InputTag;
+
+	// 이 부여 건에 묶을 데이터 (예: GA_MeleeAttack의 시작 공격 데이터). 스펙의 SourceObject가 된다
+	// 비우면 캐릭터 자신이 SourceObject가 된다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability")
+	TObjectPtr<UPrimaryDataAsset> AbilityData;
 };
 
 UCLASS(Abstract)

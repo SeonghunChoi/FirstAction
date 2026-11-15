@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
+#include "Engine/DataAsset.h"
 #include "GameplayEffect.h"
 #include "Combat/CombatAttributeSet.h"
 #include "FirstAction.h"
@@ -108,7 +109,9 @@ void ACombatCharacterBase::GrantStartupAbilitiesAndEffects()
 			continue;
 		}
 
-		FGameplayAbilitySpec Spec(Grant.Ability, 1, INDEX_NONE, this);
+		// 부여 건에 데이터가 있으면 그것을, 없으면 캐릭터를 SourceObject로 둔다
+		UObject* SourceObject = Grant.AbilityData ? static_cast<UObject*>(Grant.AbilityData) : static_cast<UObject*>(this);
+		FGameplayAbilitySpec Spec(Grant.Ability, 1, INDEX_NONE, SourceObject);
 		if (Grant.InputTag.IsValid())
 		{
 			// 입력 태그는 클래스가 아니라 이 부여 건(스펙)에 붙인다. 같은 클래스를 다른 태그로 또 부여할 수 있다
