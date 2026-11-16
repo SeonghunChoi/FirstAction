@@ -13,6 +13,8 @@
 class UAttackDataAsset;
 class UAbilityTask_PlayMontageAndWait;
 class ACombatCharacterBase;
+class UGameplayEffect;
+struct FGameplayEventData;
 
 UCLASS()
 class FIRSTACTION_API UGA_MeleeAttack : public UGameplayAbility
@@ -34,7 +36,17 @@ protected:
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
+	// 맞은 대상에게 적용할 피해 이펙트 (Step 5-3)
+	// C++에서 에셋 경로를 하드코딩하지 않도록 블루프린트 자식(BP_GA_MeleeAttack)의 기본값에서 지정한다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
+	TSubclassOf<UGameplayEffect> DamageEffect;
+
 private:
+	// 판정이 대상을 맞힘 (Event.Hit) → 피해 이펙트 적용
+	// Step 6-4에서 이 사이에 타격 해석 매니저(UHitResolveSubsystem)가 들어간다(설계 규칙 6)
+	UFUNCTION()
+	void OnHitEvent(FGameplayEventData Payload);
+
 	// 시작 공격 데이터를 정한다. 지금은 부여 건의 데이터(SourceObject)만 본다.
 	// AI용 이벤트 페이로드 경로는 Step 7에서 여기에 추가한다
 	const UAttackDataAsset* ResolveStartAttack() const;

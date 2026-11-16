@@ -103,6 +103,10 @@ protected:
 private:
 	void GrantStartupAbilitiesAndEffects();
 
+	// 무기 판정이 대상을 맞힘 → 자신의 ASC에 Event.Hit 게임플레이 이벤트를 보낸다 (Step 5-3)
+	// 판정 컴포넌트는 GAS를 모르고, 공격 어빌리티는 판정 컴포넌트를 모른다. 둘을 잇는 다리
+	void HandleMeleeTraceHit(const FHitResult& Hit);
+
 	// 새 어빌리티를 시작하지 못한 입력을 기록한다. 가장 최근 입력 하나만 남긴다
 	void BufferInput(const FGameplayTag& InputTag);
 

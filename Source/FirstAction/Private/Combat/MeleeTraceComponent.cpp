@@ -1,6 +1,7 @@
 #include "Combat/MeleeTraceComponent.h"
 
 #include "Components/MeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
@@ -87,7 +88,8 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 
 	const bool bDebugDraw = CVarShowMeleeTrace.GetValueOnGameThread();
 
-	// 캐릭터(Pawn 오브젝트 타입)만 맞힌다. 캡슐과 메시 모두 Pawn이라 메시에 맞으면 맞은 본 이름도 들어온다
+	// 캐릭터(Pawn 오브젝트 타입)만 맞힌다. 캡슐과 메시가 모두 Pawn이지만,
+	// 아래에서 스켈레탈 메시(피직스 바디)에 맞은 결과만 인정한다 → 실제 몸에 닿은 순간, 맞은 본 이름과 함께
 	FCollisionObjectQueryParams ObjectParams;
 	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
 
@@ -111,6 +113,12 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 
 		for (const FHitResult& Hit : Hits)
 		{
+			// 캡슐은 몸보다 커서 칼이 허공에 있을 때 먼저 걸리고 본 정보도 없다. 메시에 맞은 것만 받는다
+			if (!Cast<USkeletalMeshComponent>(Hit.GetComponent()))
+			{
+				continue;
+			}
+
 			AActor* HitActor = Hit.GetActor();
 			if (!HitActor || HitActors.Contains(HitActor))
 			{

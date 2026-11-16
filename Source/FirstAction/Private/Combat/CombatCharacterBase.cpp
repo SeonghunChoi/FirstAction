@@ -2,6 +2,8 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
+#include "Abilities/GameplayAbilityTargetTypes.h"
+#include "Combat/CombatTags.h"
 #include "Engine/DataAsset.h"
 #include "Engine/CollisionProfile.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -101,6 +103,19 @@ void ACombatCharacterBase::AbilityInputTagReleased(FGameplayTag InputTag)
 	}
 }
 
+void ACombatCharacterBase::HandleMeleeTraceHit(const FHitResult& Hit)
+{
+	FGameplayEventData Payload;
+	Payload.EventTag = CombatTags::Event_Hit;
+	Payload.Instigator = this;
+	Payload.Target = Hit.GetActor();
+
+	// 맞은 위치, 맞은 본 등 판정 결과 전체를 타깃 데이터로 싣는다 (6-4 타격 해석, 6-8 부위 반응에서 사용)
+	Payload.TargetData.Add(new FGameplayAbilityTargetData_SingleTargetHit(Hit));
+
+	AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
+}
+
 void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
 {
 	if (InputBufferDuration <= 0.f || !GetWorld())
@@ -149,6 +164,7 @@ void ACombatCharacterBase::BeginPlay()
 	Super::BeginPlay();
 
 	MeleeTrace->SetWeaponMesh(WeaponMesh);
+	MeleeTrace->OnHit.AddUObject(this, &ACombatCharacterBase::HandleMeleeTraceHit);
 
 	// 소유자(Owner)와 몸(Avatar)이 모두 이 캐릭터. 컨트롤러가 없는 훈련 더미도 여기서 초기화된다
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);

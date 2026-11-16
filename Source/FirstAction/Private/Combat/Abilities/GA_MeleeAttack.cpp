@@ -1,8 +1,11 @@
 #include "Combat/Abilities/GA_MeleeAttack.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayTag.h"
+#include "GameplayEffect.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/AttackDataAsset.h"
 #include "Combat/CombatCharacterBase.h"
@@ -62,6 +65,12 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		UAbilityTask_WaitGameplayTagAdded::WaitGameplayTagAdd(this, CombatTags::Window_Combo, nullptr, false);
 	WaitComboWindow->Added.AddDynamic(this, &UGA_MeleeAttack::OnComboWindowOpened);
 	WaitComboWindow->ReadyForActivation();
+
+	// 판정이 대상을 맞히면 캐릭터가 Event.Hit을 보낸다. 콤보가 이어지는 동안 계속 받는다
+	UAbilityTask_WaitGameplayEvent* WaitHit =
+		UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, CombatTags::Event_Hit, nullptr, false, true);
+	WaitHit->EventReceived.AddDynamic(this, &UGA_MeleeAttack::OnHitEvent);
+	WaitHit->ReadyForActivation();
 
 	// 구간 안에서 누른 입력도 바로 처리하도록 버퍼 기록을 구독한다
 	if (ACombatCharacterBase* Character = GetCombatCharacter())
@@ -144,6 +153,50 @@ void UGA_MeleeAttack::TryAdvanceCombo()
 
 	CurrentAttack = ChosenLink->NextAttack;
 	PlayCurrentAttackMontage();
+}
+
+void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
+{
+	if (!IsActive() || !CurrentAttack)
+	{
+		return;
+	}
+
+	AActor* Target = const_cast<AActor*>(Payload.Target.Get());
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target);
+	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
+	if (!TargetASC || !SourceASC)
+	{
+		// ASC가 없는 대상(벽에 붙은 장식 Pawn 등)은 피해를 받지 않는다
+		return;
+	}
+
+	if (!DamageEffect)
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] GA_MeleeAttack: DamageEffect가 지정되지 않았습니다. BP_GA_MeleeAttack 기본값을 확인하세요."),
+			*GetNameSafe(GetAvatarActorFromActorInfo()));
+		return;
+	}
+
+	FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
+	if (!SpecHandle.IsValid())
+	{
+		return;
+	}
+
+	// 피해량은 공격 데이터에서. GE_Damage는 Health에 이 값을 더하므로 음수로 넘긴다
+	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_Damage, -CurrentAttack->Damage);
+
+	// 판정 결과(맞은 위치, 본)를 이펙트 컨텍스트에 함께 싣는다. 피격 이펙트, 반응에서 꺼내 쓸 수 있다
+	if (const FHitResult* Hit = Payload.TargetData.Get(0) ? Payload.TargetData.Get(0)->GetHitResult() : nullptr)
+	{
+		SpecHandle.Data->GetContext().AddHitResult(*Hit, true);
+	}
+
+	SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 피해: %s → %s (%.1f)"),
+		*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target), CurrentAttack->Damage);
 }
 
 void UGA_MeleeAttack::OnComboWindowOpened()
