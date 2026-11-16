@@ -14,6 +14,7 @@ class UAttackDataAsset;
 class UAbilityTask_PlayMontageAndWait;
 class ACombatCharacterBase;
 class UGameplayEffect;
+class UMotionWarpingComponent;
 struct FGameplayEventData;
 
 UCLASS()
@@ -57,10 +58,19 @@ private:
 
 	ACombatCharacterBase* GetCombatCharacter() const;
 
-	// 캐릭터에 공격 대상을 묻고 워핑 목표를 등록한다. 몽타주를 재생할 때마다(콤보 타마다) 부른다 (Step 6-2)
+	// 캐릭터에 공격 대상을 묻고 워핑 목표를 등록한다 (Step 6-2)
 	// 목표: 대상 쪽 방향, 몸끼리 닿는 위치(양쪽 캡슐 반지름 합)까지, 단 MaxWarpDistance를 넘지 않음
 	// 대상이 없으면 목표를 지워 원래 루트 모션대로 휘두른다
 	void UpdateWarpTarget();
+
+	// Motion Warping 구간이 시작될 때마다 대상을 다시 묻는다 (6-6에서 발견한 문제의 수정)
+	// 엔진이 새 구간의 수정자(modifier)를 만든 직후, 활성화하기 직전에 불린다. 한 몽타주에 여러 번 휘두르는 공격(Heavy_Combo)도 휘두름마다 새 목표를 쓴다
+	UFUNCTION()
+	void OnMotionWarpingPreUpdate(UMotionWarpingComponent* MotionWarpingComp);
+
+	// 이미 목표를 갱신해 준 구간의 수정자. 같은 구간에서 매 프레임 다시 묻지 않도록
+	// (헤더에서 수정자 클래스 정의를 몰라도 되도록 UObject로 보관)
+	TSet<TWeakObjectPtr<UObject>> RefreshedWarpModifiers;
 
 	// CurrentAttack의 몽타주를 재생한다. 이전 몽타주 태스크가 있으면 콜백을 떼고 정리한 뒤 교체한다
 	void PlayCurrentAttackMontage();

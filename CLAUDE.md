@@ -381,8 +381,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-5: 공격 데이터 `PostHitMoveDuration`, `ACombatCharacterBase::ApplyHitDisplacement`(루트 모션 몽타주 중이면 `ProcessRootMotionPostConvertToWorld`에서 애니메이션 루트 모션에 더하고, 아니면 Root Motion Source Override·Z 무시·끝나면 속도 0). 때린 쪽은 `GA_MeleeAttack`, 맞은 쪽은 `Event.HitReact` 수신에서 각자 적용. 컨트롤러 없는 더미는 `bRunPhysicsWithNoController`(엔진이 이동 계산을 건너뛰던 문제). 더미 밀림 확인 (2026-11-16)
 
+- [x] Step 6-6: `DA_Character_Dummy_Small`(40kg), `DA_Character_Dummy_Large`(300kg), 자식 블루프린트 `BP_TrainingDummy_Small`/`_Large`를 `Lvl_Training`에 배치(스케일 0.75/1.4). 세 질량 모두 밀림 거리 적당 → 기준값 유지, `Docs/Tuning.md`에 기록. 발견한 문제: `Heavy_Combo`(워핑 구간 4개)가 2타부터 낡은 목표로 워핑 → `UMotionWarpingComponent::OnPreUpdate`에서 구간 시작마다 대상 재질의로 수정, 확인 (2026-11-17)
+
 ### 현재 위치
-- **Step 6-6** 시작 전: 작은 더미와 큰 더미를 나란히 두고 같은 콤보로 타격 후 간격 비교 → 분배 공식 튜닝
+- **Step 6-7** 시작 전: `GA_HitReact` (상대 충격량 기반 반응 단계, 방향별 반응, 경직치 0이면 그로기)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -407,6 +409,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
 - 2026-11-16: 히트스톱은 각자 건다(6-1). 공격 어빌리티는 자기 캐릭터에만 걸고, 맞은 쪽에는 게임플레이 이벤트로 멈춤 시간을 넘겨 스스로 건다
 - 2026-11-16: 타격 연출(카메라 흔들림, 타격음, 불꽃)은 GameplayCue로 한다(6-1). 게임 코드는 연출을 모르고, 연출 추가는 Cue 에셋만 고친다. 히트스톱은 Cue가 아니라 이벤트 경로
+- 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다
 - 2026-11-16: `UCombatCharacterData`에는 지금 `Mass`만 넣는다(6-3). 반응 관련 칸은 쓰는 스텝(6-7, 6-8)에서 추가하고, 조작감 값(입력 버퍼, 히트스톱 배율, 대상 원뿔)은 블루프린트 기본값에 둔다. `Mass`는 kg이고 정본이며, 시작할 때 캐릭터 무브먼트 `Mass`에 복사한다

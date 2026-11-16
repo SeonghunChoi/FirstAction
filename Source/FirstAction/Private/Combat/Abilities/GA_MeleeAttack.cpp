@@ -15,6 +15,7 @@
 #include "DrawDebugHelpers.h"
 #include "HAL/IConsoleManager.h"
 #include "MotionWarpingComponent.h"
+#include "RootMotionModifier.h"
 
 namespace
 {
@@ -89,6 +90,13 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	if (ACombatCharacterBase* Character = GetCombatCharacter())
 	{
 		InputBufferedHandle = Character->OnInputBuffered.AddUObject(this, &UGA_MeleeAttack::OnInputBuffered);
+
+		// 워핑 구간이 시작될 때마다 대상을 다시 묻는다
+		if (UMotionWarpingComponent* MotionWarping = Character->GetMotionWarping())
+		{
+			RefreshedWarpModifiers.Reset();
+			MotionWarping->OnPreUpdate.AddDynamic(this, &UGA_MeleeAttack::OnMotionWarpingPreUpdate);
+		}
 	}
 }
 
@@ -114,8 +122,14 @@ void UGA_MeleeAttack::PlayCurrentAttackMontage()
 		return;
 	}
 
-	// 이번 타의 워핑 목표. 몽타주의 Motion Warping 구간이 이 목표를 보고 루트 모션을 보정한다
-	UpdateWarpTarget();
+	// 이전 몽타주의 목표는 지운다. 새 목표는 이 몽타주의 Motion Warping 구간이 시작될 때 등록한다(OnMotionWarpingPreUpdate)
+	if (ACombatCharacterBase* Character = GetCombatCharacter())
+	{
+		if (UMotionWarpingComponent* MotionWarping = Character->GetMotionWarping())
+		{
+			MotionWarping->RemoveWarpTarget(WarpTargetName);
+		}
+	}
 
 	// 몽타주를 재생하고 끝날 때까지 기다리는 어빌리티 태스크 (코루틴의 yield 지점에 해당)
 	// 어빌리티가 먼저 끝나면 몽타주도 함께 멈춘다(bStopWhenAbilityEnds 기본값 true)
@@ -172,6 +186,28 @@ void UGA_MeleeAttack::UpdateWarpTarget()
 		DrawDebugLine(World, From, Target->GetActorLocation(), FColor::Orange, false, 1.5f, 0, 1.5f);
 		DrawDebugSphere(World, WarpLocation, 15.f, 12, FColor::Green, false, 1.5f);
 		DrawDebugDirectionalArrow(World, WarpLocation, WarpLocation + Direction * 60.f, 20.f, FColor::Green, false, 1.5f, 0, 2.f);
+	}
+}
+
+void UGA_MeleeAttack::OnMotionWarpingPreUpdate(UMotionWarpingComponent* MotionWarpingComp)
+{
+	if (!IsActive() || !MotionWarpingComp)
+	{
+		return;
+	}
+
+	for (URootMotionModifier* Modifier : MotionWarpingComp->GetModifiers())
+	{
+		// 이 공격의 목표 이름을 쓰는 구간이 막 생겨 아직 활성화 전(Waiting)이면, 휘두름이 시작되는 순간이다
+		const URootMotionModifier_Warp* WarpModifier = Cast<URootMotionModifier_Warp>(Modifier);
+		if (WarpModifier && WarpModifier->WarpTargetName == WarpTargetName
+			&& WarpModifier->GetState() == ERootMotionModifierState::Waiting
+			&& !RefreshedWarpModifiers.Contains(Modifier))
+		{
+			RefreshedWarpModifiers.Add(Modifier);
+			UpdateWarpTarget();
+			return;
+		}
 	}
 }
 
@@ -341,8 +377,10 @@ void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
 		if (UMotionWarpingComponent* MotionWarping = Character->GetMotionWarping())
 		{
 			MotionWarping->RemoveWarpTarget(WarpTargetName);
+			MotionWarping->OnPreUpdate.RemoveDynamic(this, &UGA_MeleeAttack::OnMotionWarpingPreUpdate);
 		}
 	}
+	RefreshedWarpModifiers.Reset();
 
 	CurrentAttack = nullptr;
 	MontageTask = nullptr;
