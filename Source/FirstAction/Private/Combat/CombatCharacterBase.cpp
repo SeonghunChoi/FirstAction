@@ -3,8 +3,12 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
 #include "Engine/DataAsset.h"
+#include "Engine/CollisionProfile.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameplayEffect.h"
 #include "Combat/CombatAttributeSet.h"
+#include "Combat/MeleeTraceComponent.h"
 #include "FirstAction.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
@@ -13,6 +17,15 @@ ACombatCharacterBase::ACombatCharacterBase()
 
 	// 캐릭터의 기본 서브오브젝트로 만든 속성 세트는 ASC가 초기화될 때 찾아서 등록한다
 	CombatAttributeSet = CreateDefaultSubobject<UCombatAttributeSet>(TEXT("CombatAttributeSet"));
+
+	// 무기 메시: 마네킹 기본 소켓 HandGrip_R에 붙인다 (CLAUDE.md 5.1). 블루프린트에서 부모 소켓을 바꿀 수 있다
+	// 판정은 소켓 스윕으로 하므로 무기 몸체는 아무것과도 충돌하지 않는다
+	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMesh"));
+	WeaponMesh->SetupAttachment(GetMesh(), TEXT("HandGrip_R"));
+	WeaponMesh->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+	WeaponMesh->SetGenerateOverlapEvents(false);
+
+	MeleeTrace = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MeleeTrace"));
 }
 
 UAbilitySystemComponent* ACombatCharacterBase::GetAbilitySystemComponent() const
@@ -134,6 +147,8 @@ bool ACombatCharacterBase::ConsumeBufferedInput(const FGameplayTagContainer& Acc
 void ACombatCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	MeleeTrace->SetWeaponMesh(WeaponMesh);
 
 	// 소유자(Owner)와 몸(Avatar)이 모두 이 캐릭터. 컨트롤러가 없는 훈련 더미도 여기서 초기화된다
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);

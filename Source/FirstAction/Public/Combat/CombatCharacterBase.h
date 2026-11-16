@@ -15,6 +15,8 @@ class UCombatAttributeSet;
 class UGameplayAbility;
 class UGameplayEffect;
 class UPrimaryDataAsset;
+class UStaticMeshComponent;
+class UMeleeTraceComponent;
 
 // 시작할 때 부여할 어빌리티 한 줄. 같은 어빌리티 클래스를 다른 입력 태그로 여러 번 부여할 수 있다.
 USTRUCT(BlueprintType)
@@ -64,6 +66,8 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	UCombatAttributeSet* GetCombatAttributeSet() const { return CombatAttributeSet; }
+	UStaticMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
+	UMeleeTraceComponent* GetMeleeTrace() const { return MeleeTrace; }
 
 	// 입력 태그로 어빌리티 실행을 요청한다. 플레이어 입력도 AI도 이 두 함수만 부른다(설계 규칙 1)
 	//   눌림: 짝인 어빌리티가 실행 중이 아니면 활성화를 시도하고, 실행 중이면 입력 눌림을 전달한다
@@ -111,6 +115,14 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCombatAttributeSet> CombatAttributeSet;
+
+	// 무기 메시. 손 소켓(HandGrip_R)에 붙는다. 블루프린트에서 메시 에셋만 고르고, 무기가 없으면 비워 둔다 (Step 5-1)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> WeaponMesh;
+
+	// 무기 판정 (Step 5-1)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMeleeTraceComponent> MeleeTrace;
 
 	// 시작 어빌리티/이펙트를 두 번 부여하지 않도록
 	bool bStartupGranted = false;
