@@ -56,6 +56,7 @@ void UMeleeTraceComponent::BeginTrace()
 {
 	HitActors.Reset();
 	PreviousSamples.Reset();
+	SweepFrameCount = 0;
 
 	if (!ComputeBladeSamples(PreviousSamples))
 	{
@@ -70,6 +71,13 @@ void UMeleeTraceComponent::BeginTrace()
 
 void UMeleeTraceComponent::EndTrace()
 {
+	if (bTracing)
+	{
+		// 한 휘두름 요약. 프레임이 낮을수록 스윕 횟수가 줄어든다 (Step 5-6 재현용)
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] 판정 구간 끝: 스윕 %d프레임, 맞힘 %d"),
+			*GetNameSafe(GetOwner()), SweepFrameCount, HitActors.Num());
+	}
+
 	bTracing = false;
 	SetComponentTickEnabled(false);
 	PreviousSamples.Reset();
@@ -87,6 +95,7 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	}
 
 	const bool bDebugDraw = CVarShowMeleeTrace.GetValueOnGameThread();
+	++SweepFrameCount;
 
 	// 캐릭터(Pawn 오브젝트 타입)만 맞힌다. 캡슐과 메시가 모두 Pawn이지만,
 	// 아래에서 스켈레탈 메시(피직스 바디)에 맞은 결과만 인정한다 → 실제 몸에 닿은 순간, 맞은 본 이름과 함께
@@ -97,7 +106,8 @@ void UMeleeTraceComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	const FCollisionShape Sphere = FCollisionShape::MakeSphere(TraceRadius);
 
 	// 칼날 위 점마다 "이전 프레임 위치 → 이번 프레임 위치"를 구체로 스윕한다
-	// (프레임이 낮으면 이 직선 경로가 실제 호를 크게 벗어난다 → Step 5-6에서 서브스텝 보간으로 해결)
+	// 칼끝은 호를 그리므로 직선 경로는 호의 안쪽을 지난다. Step 5-6 측정에서 10fps까지 누락이 없어 보간은 넣지 않았다.
+	// Hit Window를 줄이거나 빠른 공격을 넣으면 "판정 구간 끝" 로그로 다시 측정한다
 	for (int32 Index = 0; Index < CurrentSamples.Num(); ++Index)
 	{
 		const FVector& From = PreviousSamples[Index];

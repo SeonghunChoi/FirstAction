@@ -64,5 +64,8 @@ private:
 	// 이번 휘두름에서 이미 맞은 대상
 	TSet<TWeakObjectPtr<AActor>> HitActors;
 
+	// 이번 휘두름에서 스윕한 프레임 수. 저 프레임 판정 누락을 확인하는 진단용 (Step 5-6)
+	int32 SweepFrameCount = 0;
+
 	bool bTracing = false;
 };

@@ -242,7 +242,7 @@ Content/
 - 5-3. `Event.Hit` → `GE_Damage`(SetByCaller) 적용
 - 5-4. `PostGameplayEffectExecute`에서 경직치 처리
 - 5-5. 훈련용 더미 배치
-- 5-6. 저 프레임(`t.MaxFPS 15`)에서 판정 누락 재현 → 서브스텝 보간으로 해결
+- 5-6. 저 프레임(`t.MaxFPS 15`)에서 판정 누락 재현 → 서브스텝 보간으로 해결 (측정 결과 누락 없음 → 보간 보류, 진단 로그만 추가)
 - ✅ 마일스톤: 더미의 체력과 경직치가 줄고, 15fps에서도 판정이 누락되지 않는다
 
 ### Step 6. 조작감
@@ -364,8 +364,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 5-5: `ATrainingDummy`(템플릿 `ACombatDummy`와 이름 충돌을 피해 개명, AI 자동 빙의 끔, 체력이나 경직치가 0이 되면 `RefillDelay` 뒤 `ApplyStartupEffects`로 리필). 기반 클래스에서 `ApplyStartupEffects` 분리. `Portfolio/Characters/BP_TrainingDummy`(무기 없음, `GE_InitAttributes`, `RefillDelay` 2초), `Portfolio/Maps/Lvl_Training`에 배치, 판정·피해·Groggy·리필 확인 (2026-11-16)
 
+- [x] Step 5-6: `UMeleeTraceComponent`에 휘두름마다 `판정 구간 끝: 스윕 N프레임, 맞힘 M` 진단 로그. 제한 없음/60/15/10fps 비교에서 누락 없음, `스윕 0프레임` 없음 → 서브스텝 보간은 보류 (2026-11-16)
+- [x] ✅ Step 5 마일스톤: 더미의 체력과 경직치가 줄고(Groggy, 리필 포함), 10fps에서도 판정이 누락되지 않는다 (2026-11-16)
+
 ### 현재 위치
-- **Step 5-6** 시작 전: 저 프레임(`t.MaxFPS 15`) 판정 누락 재현 → 서브스텝 보간
+- **Step 6-1** 시작 전: 히트스톱(`CustomTimeDilation`), 카메라 흔들림
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -388,6 +391,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: 플레이어 클래스는 템플릿 `AFirstActionCharacter`를 고쳐 쓴다. 부모만 `ACharacter` → `ACombatCharacterBase`로 바꾸고, `BP_ThirdPersonCharacter`는 그대로 쓴다. 플레이어 전용 코드(입력 → 어빌리티, 락온)는 이 클래스에 추가한다
 - 2026-11-15: 어빌리티와 입력 태그의 짝은 부여 목록(`{어빌리티, 입력 태그}`)에 둔다. 같은 `GA_MeleeAttack`을 약공격·강공격 두 입력에 묶어야 하기 때문
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
+- 2026-11-16: 저 프레임 판정은 측정 결과만 기록한다(5-6). 10fps까지 누락이 없어 서브스텝 보간은 넣지 않고, 진단 로그를 남겨 Hit Window를 줄이거나 빠른 공격을 추가할 때(6-15) 다시 측정한다
 - 2026-11-16: 훈련 더미는 체력이나 경직치가 0이 되면 `RefillDelay` 뒤 시작 이펙트를 다시 적용해 자동으로 채운다
 - 2026-11-16: Step 5의 경직치 감소량은 공격 데이터 임시 칸 `PoiseDamage`에서 가져온다. 6-4에서 상대 충격량 계산으로 바뀌면 칸을 삭제한다
 - 2026-11-16: 피해는 `GE_Damage`가 `Health`에 SetByCaller 음수 값을 바로 더한다. 메타 속성(`IncomingDamage`)은 쓰지 않는다. 감소 계산은 매니저가 적용 전에 한다
