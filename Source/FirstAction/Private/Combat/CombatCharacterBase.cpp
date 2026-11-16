@@ -205,6 +205,16 @@ void ACombatCharacterBase::GrantStartupAbilitiesAndEffects()
 		AbilitySystemComponent->GiveAbility(Spec);
 	}
 
+	ApplyStartupEffects();
+}
+
+void ACombatCharacterBase::ApplyStartupEffects()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
 	Context.AddSourceObject(this);
 

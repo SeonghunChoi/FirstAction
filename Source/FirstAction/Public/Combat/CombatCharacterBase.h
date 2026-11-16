@@ -95,6 +95,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Startup")
 	TArray<TSubclassOf<UGameplayEffect>> StartupEffects;
 
+	// StartupEffects를 자신에게 적용한다. 시작할 때 한 번, 훈련 더미는 리필할 때 다시 부른다 (Step 5-5)
+	void ApplyStartupEffects();
+
 	// 입력 버퍼 보관 시간(초). 이보다 오래된 입력은 버린다. 0이면 버퍼를 쓰지 않는다
 	// 튜닝값이므로 C++ 기본값은 0이고, 블루프린트 기본값에서 정한다(설계 규칙 3)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Input", meta = (ClampMin = "0.0", Units = "s"))

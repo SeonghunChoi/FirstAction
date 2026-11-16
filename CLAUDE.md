@@ -158,6 +158,7 @@ Source/FirstAction/
 │   │   ├── CombatTags.h               // 네이티브 태그
 │   │   ├── CombatCharacterBase.h      // ASC 부착, 플레이어/적 공통
 │   │   ├── CombatAttributeSet.h       // Health, Poise
+│   │   ├── TrainingDummy.h            // 훈련 더미 (0이 되면 자동 리필). 템플릿 CombatDummy와 이름 충돌을 피함
 │   │   ├── CombatCharacterData.h      // 질량, 부위 반응 임계값, 반응 몽타주
 │   │   ├── AttackDataAsset.h
 │   │   ├── HitResolveSubsystem.h      // FHitResolution, 간격 분배, 상대 충격량
@@ -361,8 +362,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 5-4: 공격 데이터 임시 칸 `PoiseDamage`(6-4에서 삭제 예정) → `SetByCaller.PoiseDamage`, `GE_Damage`에 Poise 모디파이어 추가. `UCombatAttributeSet`이 `Pre/PostGameplayEffectExecute`로 경직치가 0보다 큰 값에서 0이 되는 순간에만 `Event.Groggy`(Instigator = 공격자) 1회 (2026-11-16)
 
+- [x] Step 5-5: `ATrainingDummy`(템플릿 `ACombatDummy`와 이름 충돌을 피해 개명, AI 자동 빙의 끔, 체력이나 경직치가 0이 되면 `RefillDelay` 뒤 `ApplyStartupEffects`로 리필). 기반 클래스에서 `ApplyStartupEffects` 분리. `Portfolio/Characters/BP_TrainingDummy`(무기 없음, `GE_InitAttributes`, `RefillDelay` 2초), `Portfolio/Maps/Lvl_Training`에 배치, 판정·피해·Groggy·리필 확인 (2026-11-16)
+
 ### 현재 위치
-- **Step 5-5** 시작 전: 훈련용 더미 배치
+- **Step 5-6** 시작 전: 저 프레임(`t.MaxFPS 15`) 판정 누락 재현 → 서브스텝 보간
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -385,6 +388,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: 플레이어 클래스는 템플릿 `AFirstActionCharacter`를 고쳐 쓴다. 부모만 `ACharacter` → `ACombatCharacterBase`로 바꾸고, `BP_ThirdPersonCharacter`는 그대로 쓴다. 플레이어 전용 코드(입력 → 어빌리티, 락온)는 이 클래스에 추가한다
 - 2026-11-15: 어빌리티와 입력 태그의 짝은 부여 목록(`{어빌리티, 입력 태그}`)에 둔다. 같은 `GA_MeleeAttack`을 약공격·강공격 두 입력에 묶어야 하기 때문
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
+- 2026-11-16: 훈련 더미는 체력이나 경직치가 0이 되면 `RefillDelay` 뒤 시작 이펙트를 다시 적용해 자동으로 채운다
 - 2026-11-16: Step 5의 경직치 감소량은 공격 데이터 임시 칸 `PoiseDamage`에서 가져온다. 6-4에서 상대 충격량 계산으로 바뀌면 칸을 삭제한다
 - 2026-11-16: 피해는 `GE_Damage`가 `Health`에 SetByCaller 음수 값을 바로 더한다. 메타 속성(`IncomingDamage`)은 쓰지 않는다. 감소 계산은 매니저가 적용 전에 한다
 - 2026-11-16: 무기 메시(`WeaponMesh`)와 판정 컴포넌트(`MeleeTrace`)는 `ACombatCharacterBase`가 C++로 가진다. 블루프린트는 검 메시 에셋만 고르고, 더미는 비워 둔다
