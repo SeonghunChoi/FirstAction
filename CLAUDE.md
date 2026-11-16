@@ -379,8 +379,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-4: `UCombatSettings`(프로젝트 설정 "Combat": `KnockbackDistancePerImpulse` 0.2s, `PoiseDamagePerImpulse` 0.07), `UHitResolveSubsystem::Resolve`(상대 충격량 → 맞은 쪽 밀림, 때린 쪽이 나머지), `FHitResolution`과 전달용 `FGameplayAbilityTargetData_HitResolution`. 공격 데이터 `ImpactForce`/`PostHitSpacing` 추가, 임시 `PoiseDamage` 삭제. 피해·경직치·양쪽 히트스톱이 해석 결과로 흐름. 로그로 공식 확인(간격 52→150, 밀림 120, 때린 쪽 전진 22 / 간격 0→150, 후퇴 30), Groggy 동작. 이동 적용은 6-5 (2026-11-16)
 
+- [x] Step 6-5: 공격 데이터 `PostHitMoveDuration`, `ACombatCharacterBase::ApplyHitDisplacement`(루트 모션 몽타주 중이면 `ProcessRootMotionPostConvertToWorld`에서 애니메이션 루트 모션에 더하고, 아니면 Root Motion Source Override·Z 무시·끝나면 속도 0). 때린 쪽은 `GA_MeleeAttack`, 맞은 쪽은 `Event.HitReact` 수신에서 각자 적용. 컨트롤러 없는 더미는 `bRunPhysicsWithNoController`(엔진이 이동 계산을 건너뛰던 문제). 더미 밀림 확인 (2026-11-16)
+
 ### 현재 위치
-- **Step 6-5** 시작 전: 때린 쪽 이동 적용(작은 적: 전진, 큰 적: 뒤로 밀림), 맞는 쪽 밀려남 적용
+- **Step 6-6** 시작 전: 작은 더미와 큰 더미를 나란히 두고 같은 콤보로 타격 후 간격 비교 → 분배 공식 튜닝
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -405,6 +407,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
 - 2026-11-16: 히트스톱은 각자 건다(6-1). 공격 어빌리티는 자기 캐릭터에만 걸고, 맞은 쪽에는 게임플레이 이벤트로 멈춤 시간을 넘겨 스스로 건다
 - 2026-11-16: 타격 연출(카메라 흔들림, 타격음, 불꽃)은 GameplayCue로 한다(6-1). 게임 코드는 연출을 모르고, 연출 추가는 Cue 에셋만 고친다. 히트스톱은 Cue가 아니라 이벤트 경로
+- 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다
 - 2026-11-16: `UCombatCharacterData`에는 지금 `Mass`만 넣는다(6-3). 반응 관련 칸은 쓰는 스텝(6-7, 6-8)에서 추가하고, 조작감 값(입력 버퍼, 히트스톱 배율, 대상 원뿔)은 블루프린트 기본값에 둔다. `Mass`는 kg이고 정본이며, 시작할 때 캐릭터 무브먼트 `Mass`에 복사한다
 - 2026-11-16: 모션 워핑 대상은 캐릭터가 제공하고, 어빌리티는 캐릭터에 물어본다(6-2). 플레이어와 AI는 고르는 방법이 달라 각자 구현한다. 콤보 타마다 묻고, 락온이 아니면 캐릭터가 그때 다시 고른다. 플레이어는 스틱 입력 방향 우선, 스틱을 놓으면 캐릭터 정면 기준. 탐색 범위는 어빌리티가 공격 데이터의 `MaxWarpDistance`를 넘겨 묻는다. 범위 밖 대상(락온, AI)은 방향만 돌리고 최대 거리까지 붙으며, 붙는 간격은 양쪽 캡슐 반지름 합. 후보가 여럿이면 각도 우선, 원뿔(전체 60°)은 캐릭터에 하나

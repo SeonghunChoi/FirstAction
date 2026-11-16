@@ -18,6 +18,7 @@
 #include "Combat/CombatCharacterData.h"
 #include "Combat/HitResolveSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/RootMotionSource.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
 {
@@ -190,11 +191,12 @@ void ACombatCharacterBase::HandleMeleeTraceHit(const FHitResult& Hit)
 
 void ACombatCharacterBase::HandleHitReactEvent(const FGameplayEventData* Payload)
 {
-	// 타격 해석 결과(6-4)에서 자기 몫만 꺼내 적용한다. 밀림(VictimDisplacement)은 Step 6-5에서 적용한다
+	// 타격 해석 결과(6-4)에서 자기 몫만 꺼내 적용한다: 히트스톱과 밀림(6-5). 반응 몽타주는 6-7 GA_HitReact
 	const FHitResolution* Resolution = Payload ? UHitResolveSubsystem::FindHitResolution(Payload->TargetData) : nullptr;
 	if (Resolution)
 	{
 		ApplyHitStop(Resolution->VictimHitStop);
+		ApplyHitDisplacement(Resolution->Direction, Resolution->VictimDisplacement, Resolution->MoveDuration);
 	}
 }
 
@@ -221,6 +223,87 @@ void ACombatCharacterBase::ApplyHitStop(float Duration)
 void ACombatCharacterBase::EndHitStop()
 {
 	CustomTimeDilation = 1.f;
+}
+
+namespace
+{
+	const FName HitDisplacementSourceName(TEXT("HitDisplacement"));
+
+	// 이동 시간에 더해 주는 여유. 히트스톱으로 늘어난 시간을 감안한 값이고, 이보다 오래 남은 이동은 버린다
+	constexpr double HitDisplacementExpireMargin = 1.0;
+}
+
+void ACombatCharacterBase::ApplyHitDisplacement(const FVector& Direction, float Distance, float Duration)
+{
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const FVector Offset = Direction.GetSafeNormal2D() * Distance;
+	if (!Movement || !GetWorld() || Duration <= 0.f || Offset.SizeSquared() < 1.f)
+	{
+		return;
+	}
+
+	// 이전 타격의 남은 이동은 새 타격으로 대체한다
+	PendingHitDisplacement = FVector::ZeroVector;
+	PendingHitDisplacementTime = 0.f;
+	Movement->RemoveRootMotionSource(HitDisplacementSourceName);
+
+	if (IsPlayingRootMotion())
+	{
+		// 루트 모션 몽타주 재생 중: 이동 컴포넌트가 루트 모션을 처리할 때마다 남은 몫을 더한다
+		PendingHitDisplacement = Offset;
+		PendingHitDisplacementTime = Duration;
+		PendingHitDisplacementExpireTime = GetWorld()->GetTimeSeconds() + Duration + HitDisplacementExpireMargin;
+
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] 타격 후 이동 %.0fcm / %.2f초 (애니메이션 루트 모션에 더함)"), *GetName(), Distance, Duration);
+		return;
+	}
+
+	// 루트 모션 몽타주가 없음: 일정 속도로 Duration 동안 옮기는 Root Motion Source
+	TSharedPtr<FRootMotionSource_ConstantForce> Source = MakeShared<FRootMotionSource_ConstantForce>();
+	Source->InstanceName = HitDisplacementSourceName;
+	Source->AccumulateMode = ERootMotionAccumulateMode::Override;
+	Source->Priority = 5;
+	Source->Force = Offset / Duration;  // 속도(cm/s)
+	Source->Duration = Duration;
+	// 수평만 덮어쓰고 중력(Z)은 그대로 둔다
+	Source->Settings.SetFlag(ERootMotionSourceSettingsFlags::IgnoreZAccumulate);
+	// 끝나면 멈춘다. 기본값(마지막 속도 유지)이면 마찰로 더 미끄러져 간격이 어긋난다
+	Source->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
+	Source->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
+	Movement->ApplyRootMotionSource(Source);
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 타격 후 이동 %.0fcm / %.2f초 (Root Motion Source)"), *GetName(), Distance, Duration);
+}
+
+FTransform ACombatCharacterBase::ProcessHitDisplacementRootMotion(const FTransform& InRootMotion, UCharacterMovementComponent* Movement, float DeltaSeconds)
+{
+	if (PendingHitDisplacementTime <= 0.f || DeltaSeconds <= 0.f)
+	{
+		return InRootMotion;
+	}
+
+	// 몽타주가 도중에 끝나 오래 남은 이동은 버린다 (다음 공격 몽타주로 새지 않도록)
+	if (GetWorld() && GetWorld()->GetTimeSeconds() > PendingHitDisplacementExpireTime)
+	{
+		PendingHitDisplacement = FVector::ZeroVector;
+		PendingHitDisplacementTime = 0.f;
+		return InRootMotion;
+	}
+
+	// DeltaSeconds는 이 캐릭터의 시간(CustomTimeDilation 적용)이다. 히트스톱 동안은 거의 진행되지 않는다
+	const float Alpha = FMath::Min(DeltaSeconds / PendingHitDisplacementTime, 1.f);
+	const FVector Step = PendingHitDisplacement * Alpha;
+	PendingHitDisplacement -= Step;
+	PendingHitDisplacementTime -= DeltaSeconds;
+	if (PendingHitDisplacementTime <= 0.f)
+	{
+		PendingHitDisplacement = FVector::ZeroVector;
+		PendingHitDisplacementTime = 0.f;
+	}
+
+	FTransform OutRootMotion = InRootMotion;
+	OutRootMotion.AddToTranslation(Step);
+	return OutRootMotion;
 }
 
 void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
@@ -280,6 +363,9 @@ void ACombatCharacterBase::BeginPlay()
 	{
 		UE_LOG(LogFirstAction, Warning, TEXT("[%s] CharacterData가 없습니다. 블루프린트 기본값에서 지정하세요 (타격 해석에 질량이 필요)"), *GetName());
 	}
+
+	// 타격 후 이동을 애니메이션 루트 모션에 더하는 연결 지점 (6-5)
+	GetCharacterMovement()->ProcessRootMotionPostConvertToWorld.BindUObject(this, &ACombatCharacterBase::ProcessHitDisplacementRootMotion);
 
 	MeleeTrace->SetWeaponMesh(WeaponMesh);
 	MeleeTrace->OnHit.AddUObject(this, &ACombatCharacterBase::HandleMeleeTraceHit);

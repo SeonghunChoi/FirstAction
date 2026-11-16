@@ -44,6 +44,10 @@ struct FHitResolveInput
 
 	UPROPERTY(BlueprintReadWrite, Category = "Hit Resolve")
 	float HitStopDuration = 0.f;
+
+	// 타격 후 이동 시간 (초). 공격 데이터 값 (6-5)
+	UPROPERTY(BlueprintReadWrite, Category = "Hit Resolve")
+	float MoveDuration = 0.f;
 };
 
 // 매니저 출력. 때린 쪽과 맞은 쪽이 각자 자기 칸만 적용한다 (규칙 6)
@@ -83,6 +87,10 @@ struct FHitResolution
 	// 때린 쪽이 Direction 반대로 물러나는 거리 (cm). 음수면 앞으로 전진 — 때린 쪽이 적용 (6-5)
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
 	float AttackerDisplacement = 0.f;
+
+	// 양쪽 이동이 걸리는 시간 (초). 같은 시간에 움직여야 이동 중에도 간격 비율이 유지된다 (6-5)
+	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
+	float MoveDuration = 0.f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
 	float Damage = 0.f;

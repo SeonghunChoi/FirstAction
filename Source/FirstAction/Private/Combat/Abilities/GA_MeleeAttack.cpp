@@ -260,6 +260,7 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	Input.PostHitSpacing = CurrentAttack->PostHitSpacing;
 	Input.Damage = CurrentAttack->Damage;
 	Input.HitStopDuration = CurrentAttack->HitStopDuration;
+	Input.MoveDuration = CurrentAttack->PostHitMoveDuration;
 
 	const FHitResolution Resolution = Resolver->Resolve(Input);
 
@@ -282,10 +283,11 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 
 	// --- 결과 적용. 각자 자기 몫만 (규칙 6) ---
 
-	// 때린 쪽: 자기 히트스톱. 자기 이동(AttackerDisplacement)은 Step 6-5에서 적용한다
+	// 때린 쪽: 자기 히트스톱과 자기 이동 (6-5). AttackerDisplacement는 맞은 쪽 반대 방향 기준(음수면 전진)
 	if (ACombatCharacterBase* Character = GetCombatCharacter())
 	{
 		Character->ApplyHitStop(Resolution.AttackerHitStop);
+		Character->ApplyHitDisplacement(-Resolution.Direction, Resolution.AttackerDisplacement, Resolution.MoveDuration);
 	}
 
 	// 맞은 쪽: 해석 결과 전체를 전용 타깃 데이터로 실어 보낸다 (6-4 결정). 받은 쪽이 자기 몫(히트스톱, 6-5 밀림, 6-7 반응)을 적용한다

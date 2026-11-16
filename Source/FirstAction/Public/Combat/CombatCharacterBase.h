@@ -19,6 +19,7 @@ class UStaticMeshComponent;
 class UMeleeTraceComponent;
 class UMotionWarpingComponent;
 class UCombatCharacterData;
+class UCharacterMovementComponent;
 struct FGameplayEventData;
 
 // 시작할 때 부여할 어빌리티 한 줄. 같은 어빌리티 클래스를 다른 입력 태그로 여러 번 부여할 수 있다.
@@ -102,6 +103,13 @@ public:
 	// 각자 자기에게만 건다: 때린 쪽은 공격 어빌리티가, 맞은 쪽은 Event.HitReact를 받은 자신이 부른다(6-1 결정)
 	void ApplyHitStop(float Duration);
 
+	// 타격 후 이동: Direction(수평) 쪽으로 Distance(cm, 음수면 반대쪽)를 Duration초에 걸쳐 움직인다 (Step 6-5)
+	// 루트 모션 몽타주 재생 중: 애니메이션 루트 모션에 남은 이동량을 더한다 (애니메이션 전진은 살아 있음)
+	// 그 밖: Root Motion Source(Override)로 같은 거리를 옮긴다. 엔진은 애니메이션 루트 모션이 있으면 Root Motion Source를 무시한다
+	// 각자 자기에게만 건다: 때린 쪽은 공격 어빌리티가, 맞은 쪽은 Event.HitReact를 받은 자신이 부른다(규칙 6)
+	// 새 타격이 오면 남은 이동은 버리고 새 이동으로 바꾼다
+	void ApplyHitDisplacement(const FVector& Direction, float Distance, float Duration);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override;
@@ -148,6 +156,17 @@ private:
 	void EndHitStop();
 
 	FTimerHandle HitStopTimer;
+
+	// 캐릭터 무브먼트의 ProcessRootMotionPostConvertToWorld에 연결 (6-5). 월드 기준 애니메이션 루트 모션에 이번 프레임 몫을 더한다
+	// Motion Warping(6-2)은 Pre 쪽을 쓰므로 겹치지 않는다. 애니메이션 루트 모션이 있는 프레임에만 불린다
+	FTransform ProcessHitDisplacementRootMotion(const FTransform& InRootMotion, UCharacterMovementComponent* Movement, float DeltaSeconds);
+
+	// 루트 모션에 더할 남은 이동량(월드, cm)과 남은 시간(캐릭터 시간, 초)
+	FVector PendingHitDisplacement = FVector::ZeroVector;
+	float PendingHitDisplacementTime = 0.f;
+
+	// 몽타주가 이동 도중 끝나 루트 모션이 끊기면 남은 이동이 다음 몽타주로 새지 않도록 버리는 월드 시각
+	double PendingHitDisplacementExpireTime = 0.0;
 
 	void GrantStartupAbilitiesAndEffects();
 

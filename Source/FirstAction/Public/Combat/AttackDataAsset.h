@@ -51,6 +51,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Impact", meta = (ClampMin = "0.0", Units = "cm"))
 	float PostHitSpacing = 0.f;
 
+	// 타격 후 이동 시간 (초, Step 6-5). 양쪽이 각자의 이동량을 이 시간에 걸쳐 움직인다. 0이면 움직이지 않는다
+	// 히트스톱 동안은 캐릭터 시간이 느려지므로 실제로는 정지가 풀린 뒤에 대부분 진행된다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Impact", meta = (ClampMin = "0.0", Units = "s"))
+	float PostHitMoveDuration = 0.f;
+
 	// 히트스톱 시간 (Step 6-1). 맞힌 순간 때린 쪽과 맞은 쪽이 각자 이만큼 멈춘다
 	// 타격 해석 매니저(6-4)가 양쪽 값(AttackerHitStop, VictimHitStop)을 정하고, 맞은 쪽에는 FHitResolution으로 전달된다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Feel", meta = (ClampMin = "0.0", Units = "s"))

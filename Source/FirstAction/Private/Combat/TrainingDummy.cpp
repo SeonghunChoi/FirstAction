@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatAttributeSet.h"
 #include "Engine/World.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "FirstAction.h"
 
@@ -10,6 +11,10 @@ ATrainingDummy::ATrainingDummy()
 {
 	// 컨트롤러 없이 서 있기만 한다
 	AutoPossessAI = EAutoPossessAI::Disabled;
+
+	// 컨트롤러가 없는 캐릭터는 기본적으로 이동 계산을 건너뛴다 (루트 모션 몽타주 재생 중만 예외).
+	// 그러면 타격 후 밀림(Root Motion Source, 6-5)과 중력이 적용되지 않으므로 컨트롤러 없이도 이동을 계산하게 한다
+	GetCharacterMovement()->bRunPhysicsWithNoController = true;
 }
 
 void ATrainingDummy::BeginPlay()

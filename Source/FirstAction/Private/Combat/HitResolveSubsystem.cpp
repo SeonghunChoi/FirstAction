@@ -35,6 +35,7 @@ FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) cons
 	Result.Damage = Input.Damage;
 	Result.AttackerHitStop = Input.HitStopDuration;
 	Result.VictimHitStop = Input.HitStopDuration;
+	Result.MoveDuration = Input.MoveDuration;
 
 	if (!Input.Attacker || !Input.Victim)
 	{
