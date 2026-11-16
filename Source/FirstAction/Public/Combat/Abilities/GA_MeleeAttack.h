@@ -42,7 +42,7 @@ protected:
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
 private:
-	// 판정이 대상을 맞힘 (Event.Hit) → 피해 이펙트 적용
+	// 판정이 대상을 맞힘 (Event.Hit) → 피해 이펙트 적용, 히트스톱, 맞은 쪽에 Event.HitReact, 때린 쪽 Cue (Step 6-1)
 	// Step 6-4에서 이 사이에 타격 해석 매니저(UHitResolveSubsystem)가 들어간다(설계 규칙 6)
 	UFUNCTION()
 	void OnHitEvent(FGameplayEventData Payload);

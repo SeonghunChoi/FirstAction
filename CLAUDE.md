@@ -142,6 +142,7 @@
 | `AM_` 접두사 | 애니메이션 몽타주 |
 | `BP_GA_` 접두사 | C++ 어빌리티의 블루프린트 자식. 에셋 참조(이펙트 등)만 기본값으로 담는다 (`BP_GA_MeleeAttack`) |
 | `GE_`, `DA_` 접두사 | 게임플레이 이펙트, 데이터 에셋 |
+| `GCN_` 접두사 | GameplayCue Notify. 태그 이름을 따른다 (`GameplayCue.Hit.Dealt` → `GCN_Hit_Dealt`). `Portfolio/GameplayCues/`에만 둔다 (Cue 검색 경로) |
 | `IK_`, `RTG_` 접두사 | IK Rig, IK Retargeter (`IK_UAL2`, `IK_Manny`, `RTG_UAL2_Manny`) |
 | `HandGrip_R` (마네킹 스켈레톤에 원래 있는 소켓) | 검 부착 위치. `weapon_r`은 마네킹에 이미 같은 이름이 있고 손을 따라 움직이지 않아 쓰지 않는다 |
 | `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
@@ -189,6 +190,7 @@ Content/
 ├── Portfolio/
 │   ├── Characters/   // 플레이어, 적 블루프린트
 │   ├── Data/         // 공격, 패턴, Default 콘텐츠 세트
+│   ├── GameplayCues/ // GCN_ 에셋 (프로젝트 설정의 GameplayCue 검색 경로)
 │   ├── Animations/   // 기본 몽타주
 │   ├── AI/           // StateTree 에셋
 │   └── Maps/
@@ -367,8 +369,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 5-6: `UMeleeTraceComponent`에 휘두름마다 `판정 구간 끝: 스윕 N프레임, 맞힘 M` 진단 로그. 제한 없음/60/15/10fps 비교에서 누락 없음, `스윕 0프레임` 없음 → 서브스텝 보간은 보류 (2026-11-16)
 - [x] ✅ Step 5 마일스톤: 더미의 체력과 경직치가 줄고(Groggy, 리필 포함), 10fps에서도 판정이 누락되지 않는다 (2026-11-16)
 
+- [x] Step 6-1: 공격 데이터 `HitStopDuration`, `ACombatCharacterBase::ApplyHitStop`(캐릭터별 `HitStopTimeDilation`, 겹치면 긴 쪽), 맞은 쪽은 `Event.HitReact`(`EventMagnitude` = 시간)를 `GenericGameplayEventCallbacks`로 받아 스스로 적용. 연출은 GameplayCue: `GA_MeleeAttack`이 자기 ASC에 `GameplayCue.Hit.Dealt`, `GE_Damage`가 `GameplayCue.Hit.Taken`. `Portfolio/GameplayCues/GCN_Hit_Dealt`(흔들림), `GCN_Hit_Taken`(흔들림, `NS_Damage` 불꽃), Cue 검색 경로 `/Game/Portfolio/GameplayCues`, 템플릿 흔들림 에셋 `bSingleInstance`. 히트스톱·흔들림·맞은 위치 불꽃 확인. 맞은 쪽 흔들림은 적이 공격하는 Step 7에서 확인 (2026-11-16)
+
 ### 현재 위치
-- **Step 6-1** 시작 전: 히트스톱(`CustomTimeDilation`), 카메라 흔들림
+- **Step 6-2** 시작 전: 모션 워핑
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -391,6 +395,9 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: 플레이어 클래스는 템플릿 `AFirstActionCharacter`를 고쳐 쓴다. 부모만 `ACharacter` → `ACombatCharacterBase`로 바꾸고, `BP_ThirdPersonCharacter`는 그대로 쓴다. 플레이어 전용 코드(입력 → 어빌리티, 락온)는 이 클래스에 추가한다
 - 2026-11-15: 어빌리티와 입력 태그의 짝은 부여 목록(`{어빌리티, 입력 태그}`)에 둔다. 같은 `GA_MeleeAttack`을 약공격·강공격 두 입력에 묶어야 하기 때문
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
+- 2026-11-16: 히트스톱은 각자 건다(6-1). 공격 어빌리티는 자기 캐릭터에만 걸고, 맞은 쪽에는 게임플레이 이벤트로 멈춤 시간을 넘겨 스스로 건다
+- 2026-11-16: 타격 연출(카메라 흔들림, 타격음, 불꽃)은 GameplayCue로 한다(6-1). 게임 코드는 연출을 모르고, 연출 추가는 Cue 에셋만 고친다. 히트스톱은 Cue가 아니라 이벤트 경로
+- 2026-11-16: 연출 Cue는 맞힐 때마다 양쪽에서 발생한다(6-1). 때린 쪽 `GameplayCue.Hit.Dealt`(어빌리티가 자기 ASC에), 맞은 쪽 `GameplayCue.Hit.Taken`(`GE_Damage`). 흔들림 에셋은 `bSingleInstance`를 켜 여러 명을 맞혀도 쌓이지 않게 한다
 - 2026-11-16: 저 프레임 판정은 측정 결과만 기록한다(5-6). 10fps까지 누락이 없어 서브스텝 보간은 넣지 않고, 진단 로그를 남겨 Hit Window를 줄이거나 빠른 공격을 추가할 때(6-15) 다시 측정한다
 - 2026-11-16: 훈련 더미는 체력이나 경직치가 0이 되면 `RefillDelay` 뒤 시작 이펙트를 다시 적용해 자동으로 채운다
 - 2026-11-16: Step 5의 경직치 감소량은 공격 데이터 임시 칸 `PoiseDamage`에서 가져온다. 6-4에서 상대 충격량 계산으로 바뀌면 칸을 삭제한다

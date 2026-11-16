@@ -12,6 +12,7 @@
 #include "Combat/CombatAttributeSet.h"
 #include "Combat/MeleeTraceComponent.h"
 #include "FirstAction.h"
+#include "TimerManager.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
 {
@@ -116,6 +117,39 @@ void ACombatCharacterBase::HandleMeleeTraceHit(const FHitResult& Hit)
 	AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
 }
 
+void ACombatCharacterBase::HandleHitReactEvent(const FGameplayEventData* Payload)
+{
+	if (Payload)
+	{
+		ApplyHitStop(Payload->EventMagnitude);
+	}
+}
+
+void ACombatCharacterBase::ApplyHitStop(float Duration)
+{
+	if (Duration <= 0.f || HitStopTimeDilation >= 1.f || !GetWorld())
+	{
+		return;
+	}
+
+	// 타이머는 월드 시간으로 돈다. 이 캐릭터의 CustomTimeDilation에 영향을 받지 않으므로 정확히 Duration 뒤에 풀린다
+	FTimerManager& TimerManager = GetWorldTimerManager();
+	if (TimerManager.IsTimerActive(HitStopTimer) && TimerManager.GetTimerRemaining(HitStopTimer) >= Duration)
+	{
+		return;
+	}
+
+	CustomTimeDilation = HitStopTimeDilation;
+	TimerManager.SetTimer(HitStopTimer, this, &ACombatCharacterBase::EndHitStop, Duration, false);
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 히트스톱 %.3f초 (배율 %.2f)"), *GetName(), Duration, HitStopTimeDilation);
+}
+
+void ACombatCharacterBase::EndHitStop()
+{
+	CustomTimeDilation = 1.f;
+}
+
 void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
 {
 	if (InputBufferDuration <= 0.f || !GetWorld())
@@ -165,6 +199,10 @@ void ACombatCharacterBase::BeginPlay()
 
 	MeleeTrace->SetWeaponMesh(WeaponMesh);
 	MeleeTrace->OnHit.AddUObject(this, &ACombatCharacterBase::HandleMeleeTraceHit);
+
+	// 맞은 쪽 히트스톱 통로. 어빌리티 없이 이벤트 태그 하나만 듣는다 (정확히 이 태그일 때만 불린다)
+	AbilitySystemComponent->GenericGameplayEventCallbacks.FindOrAdd(CombatTags::Event_HitReact)
+		.AddUObject(this, &ACombatCharacterBase::HandleHitReactEvent);
 
 	// 소유자(Owner)와 몸(Avatar)이 모두 이 캐릭터. 컨트롤러가 없는 훈련 더미도 여기서 초기화된다
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);

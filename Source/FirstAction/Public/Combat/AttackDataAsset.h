@@ -45,6 +45,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Temporary", meta = (ClampMin = "0.0"))
 	float PoiseDamage = 0.f;
 
+	// 히트스톱 시간 (Step 6-1). 맞힌 순간 때린 쪽과 맞은 쪽이 각자 이만큼 멈춘다
+	// 맞은 쪽에는 Event.HitReact의 EventMagnitude로 전달된다. 6-4부터는 매니저가 양쪽 값을 따로 정할 수 있다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Feel", meta = (ClampMin = "0.0", Units = "s"))
+	float HitStopDuration = 0.f;
+
 	// 콤보 분기 (Step 4-3). 콤보 분기 정보는 여기에만 있다(설계 규칙 4)
 	// 몽타주의 Window.Combo 구간에서 목록의 입력이 들어오면 그 다음 공격으로 넘어간다. 비어 있으면 콤보 끝
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combo", meta = (TitleProperty = "InputTag"))

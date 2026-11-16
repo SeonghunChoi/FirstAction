@@ -196,11 +196,35 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 		SpecHandle.Data->GetContext().AddHitResult(*Hit, true);
 	}
 
+	// GE_Damage의 GameplayCues 목록에 있는 GameplayCue.Hit.Taken도 이때 맞은 쪽에서 발생한다 (Step 6-1)
 	SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 피해: %s → %s (체력 %.1f, 경직치 %.1f)"),
 		*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target),
 		CurrentAttack->Damage, CurrentAttack->PoiseDamage);
+
+	// --- 히트스톱과 연출 (Step 6-1). 각자 자기 것만 적용한다 ---
+
+	// 때린 쪽: 자기 캐릭터에만 히트스톱
+	if (ACombatCharacterBase* Character = GetCombatCharacter())
+	{
+		Character->ApplyHitStop(CurrentAttack->HitStopDuration);
+	}
+
+	// 맞은 쪽: 멈춤 시간을 이벤트로 넘긴다. 받은 쪽이 스스로 히트스톱을 건다 (6-7부터 GA_HitReact도 이 이벤트를 받는다)
+	// Step 6-4부터는 매니저가 계산한 맞은 쪽 값이 이 자리에 들어간다
+	FGameplayEventData ReactPayload;
+	ReactPayload.EventTag = CombatTags::Event_HitReact;
+	ReactPayload.Instigator = GetAvatarActorFromActorInfo();
+	ReactPayload.Target = Target;
+	ReactPayload.EventMagnitude = CurrentAttack->HitStopDuration;
+	ReactPayload.TargetData = Payload.TargetData;
+	ReactPayload.ContextHandle = SpecHandle.Data->GetContext();
+	TargetASC->HandleGameplayEvent(ReactPayload.EventTag, &ReactPayload);
+
+	// 때린 쪽 연출: 자기 ASC에 Cue를 발생시킨다. 카메라가 있으면(로컬 플레이어면) 흔들리는지는 Cue 에셋이 판단한다(규칙 1)
+	// 컨텍스트에 판정 결과가 있으므로 Cue 쪽에서 맞은 위치를 쓸 수 있다
+	SourceASC->ExecuteGameplayCue(CombatTags::GameplayCue_Hit_Dealt, SpecHandle.Data->GetContext());
 }
 
 void UGA_MeleeAttack::OnComboWindowOpened()

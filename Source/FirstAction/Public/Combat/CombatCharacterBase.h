@@ -17,6 +17,7 @@ class UGameplayEffect;
 class UPrimaryDataAsset;
 class UStaticMeshComponent;
 class UMeleeTraceComponent;
+struct FGameplayEventData;
 
 // 시작할 때 부여할 어빌리티 한 줄. 같은 어빌리티 클래스를 다른 입력 태그로 여러 번 부여할 수 있다.
 USTRUCT(BlueprintType)
@@ -83,6 +84,12 @@ public:
 	// 입력이 버퍼에 기록된 직후 호출된다
 	FOnCombatInputBuffered OnInputBuffered;
 
+	// 히트스톱: Duration초 동안 이 캐릭터만 CustomTimeDilation을 낮춘다 (Step 6-1)
+	// 애니메이션, 노티파이 구간, 이동이 함께 멈추므로 콤보 타이밍은 어긋나지 않는다.
+	// 이미 멈춰 있으면 남은 시간과 새 시간 중 긴 쪽으로 맞춘다 (한 휘두름에 여러 명을 맞혀도 한 번처럼)
+	// 각자 자기에게만 건다: 때린 쪽은 공격 어빌리티가, 맞은 쪽은 Event.HitReact를 받은 자신이 부른다(6-1 결정)
+	void ApplyHitStop(float Duration);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override;
@@ -103,7 +110,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Input", meta = (ClampMin = "0.0", Units = "s"))
 	float InputBufferDuration = 0.f;
 
+	// 히트스톱 동안의 시간 배율. 0에 가까울수록 완전히 멈춘다. 1이면 히트스톱을 쓰지 않는다
+	// 얼마나 멈출지(시간)는 공격 데이터가, 얼마나 깊게 멈출지(배율)는 캐릭터가 정한다. 튜닝값이므로 블루프린트 기본값에서 정한다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Feel", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float HitStopTimeDilation = 1.f;
+
 private:
+	// 맞은 쪽 통로: Event.HitReact를 받으면 EventMagnitude(멈춤 시간)만큼 스스로 히트스톱 (Step 6-1)
+	// 6-7의 GA_HitReact도 같은 이벤트를 받아 반응 몽타주를 재생한다. 히트스톱은 캐릭터, 반응은 어빌리티
+	void HandleHitReactEvent(const FGameplayEventData* Payload);
+
+	void EndHitStop();
+
+	FTimerHandle HitStopTimer;
+
 	void GrantStartupAbilitiesAndEffects();
 
 	// 무기 판정이 대상을 맞힘 → 자신의 ASC에 Event.Hit 게임플레이 이벤트를 보낸다 (Step 5-3)
