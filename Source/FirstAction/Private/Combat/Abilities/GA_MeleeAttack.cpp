@@ -187,6 +187,9 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	// 피해량은 공격 데이터에서. GE_Damage는 Health에 이 값을 더하므로 음수로 넘긴다
 	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_Damage, -CurrentAttack->Damage);
 
+	// 경직치 감소량. 지금은 공격 데이터의 임시 칸, Step 6-4부터는 매니저가 계산한 값
+	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_PoiseDamage, -CurrentAttack->PoiseDamage);
+
 	// 판정 결과(맞은 위치, 본)를 이펙트 컨텍스트에 함께 싣는다. 피격 이펙트, 반응에서 꺼내 쓸 수 있다
 	if (const FHitResult* Hit = Payload.TargetData.Get(0) ? Payload.TargetData.Get(0)->GetHitResult() : nullptr)
 	{
@@ -195,8 +198,9 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 
 	SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] 피해: %s → %s (%.1f)"),
-		*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target), CurrentAttack->Damage);
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 피해: %s → %s (체력 %.1f, 경직치 %.1f)"),
+		*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target),
+		CurrentAttack->Damage, CurrentAttack->PoiseDamage);
 }
 
 void UGA_MeleeAttack::OnComboWindowOpened()

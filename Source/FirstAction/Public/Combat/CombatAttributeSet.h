@@ -32,6 +32,11 @@ public:
 	// Duration/Infinite 이펙트의 모디파이어처럼 현재 값(Current)이 바뀌기 직전
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 
+	// Instant 이펙트(GE_Damage 등)가 속성을 바꾸기 직전/직후 (Step 5-4)
+	// 값을 다시 계산하지 않는다(감소 계산은 매니저 몫). 경계를 넘었는지만 보고 이벤트를 보낸다
+	virtual bool PreGameplayEffectExecute(FGameplayEffectModCallbackData& Data) override;
+	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+
 private:
 	// Health는 0 ~ MaxHealth, Poise는 0 ~ MaxPoise, 최대값은 0 이상으로 제한
 	void ClampAttribute(const FGameplayAttribute& Attribute, float& NewValue) const;
@@ -49,4 +54,7 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Combat|Poise", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData MaxPoise;
+
+	// 이펙트 실행 직전의 경직치. 범위 제한(0 미만 → 0) 때문에 실행 후 값과 변화량만으로는 이전 값을 알 수 없어서 기록한다
+	float PoiseBeforeExecute = 0.f;
 };
