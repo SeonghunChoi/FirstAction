@@ -22,7 +22,9 @@ public class FirstAction : ModuleRules
 			// GAS (Step 1-1): 공개 헤더(CombatCharacterBase.h 등)에서 GAS 타입을 쓰므로 Public
 			"GameplayAbilities",
 			"GameplayTags",
-			"GameplayTasks"
+			"GameplayTasks",
+			// 모션 워핑 (Step 6-2): 기반 캐릭터가 UMotionWarpingComponent를 가진다
+			"MotionWarping"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

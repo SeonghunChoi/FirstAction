@@ -11,6 +11,18 @@
 #include "Combat/CombatCharacterBase.h"
 #include "Combat/CombatTags.h"
 #include "FirstAction.h"
+#include "DrawDebugHelpers.h"
+#include "HAL/IConsoleManager.h"
+#include "MotionWarpingComponent.h"
+
+namespace
+{
+	// 콘솔에서 FirstAction.ShowWarpTarget 1 → 고른 대상(주황 선)과 워핑 목표(초록 구, 화살표)를 그린다
+	TAutoConsoleVariable<bool> CVarShowWarpTarget(
+		TEXT("FirstAction.ShowWarpTarget"),
+		false,
+		TEXT("공격 대상과 모션 워핑 목표를 화면에 그린다 (0: 끔, 1: 켬)"));
+}
 
 UGA_MeleeAttack::UGA_MeleeAttack()
 {
@@ -101,6 +113,9 @@ void UGA_MeleeAttack::PlayCurrentAttackMontage()
 		return;
 	}
 
+	// 이번 타의 워핑 목표. 몽타주의 Motion Warping 구간이 이 목표를 보고 루트 모션을 보정한다
+	UpdateWarpTarget();
+
 	// 몽타주를 재생하고 끝날 때까지 기다리는 어빌리티 태스크 (코루틴의 yield 지점에 해당)
 	// 어빌리티가 먼저 끝나면 몽타주도 함께 멈춘다(bStopWhenAbilityEnds 기본값 true)
 	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, CurrentAttack->Montage);
@@ -109,6 +124,54 @@ void UGA_MeleeAttack::PlayCurrentAttackMontage()
 	MontageTask->OnInterrupted.AddDynamic(this, &UGA_MeleeAttack::OnMontageCancelled);
 	MontageTask->OnCancelled.AddDynamic(this, &UGA_MeleeAttack::OnMontageCancelled);
 	MontageTask->ReadyForActivation();
+}
+
+void UGA_MeleeAttack::UpdateWarpTarget()
+{
+	ACombatCharacterBase* Character = GetCombatCharacter();
+	UMotionWarpingComponent* MotionWarping = Character ? Character->GetMotionWarping() : nullptr;
+	if (!MotionWarping || !CurrentAttack)
+	{
+		return;
+	}
+
+	// 이전 타의 목표가 남지 않도록 먼저 지운다. 목표가 없으면 Motion Warping 구간은 아무것도 고치지 않는다
+	MotionWarping->RemoveWarpTarget(WarpTargetName);
+
+	const float MaxWarpDistance = CurrentAttack->MaxWarpDistance;
+	AActor* Target = MaxWarpDistance > 0.f ? Character->FindAttackTarget(MaxWarpDistance) : nullptr;
+	if (!Target)
+	{
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s 대상 없음 (원래 루트 모션)"), *GetNameSafe(Character), *GetNameSafe(CurrentAttack));
+		return;
+	}
+
+	const FVector From = Character->GetActorLocation();
+	const FVector ToTarget = (Target->GetActorLocation() - From) * FVector(1.f, 1.f, 0.f);
+	const FVector Direction = ToTarget.GetSafeNormal();
+	if (Direction.IsNearlyZero())
+	{
+		return;
+	}
+
+	// 몸끼리 닿는 간격까지만, 그리고 최대 거리까지만 (6-2 결정). 이미 붙어 있으면 이동 0, 방향만 돌린다
+	const float ContactSpacing = Character->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius();
+	const float MoveDistance = FMath::Clamp(ToTarget.Size() - ContactSpacing, 0.f, MaxWarpDistance);
+	const FVector WarpLocation = From + Direction * MoveDistance;
+
+	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(WarpTargetName, WarpLocation, Direction.Rotation());
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s → %s (간격 %.0f, 이동 %.0f / 최대 %.0f)"),
+		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), *GetNameSafe(Target),
+		ToTarget.Size() - ContactSpacing, MoveDistance, MaxWarpDistance);
+
+	if (CVarShowWarpTarget.GetValueOnGameThread())
+	{
+		UWorld* World = Character->GetWorld();
+		DrawDebugLine(World, From, Target->GetActorLocation(), FColor::Orange, false, 1.5f, 0, 1.5f);
+		DrawDebugSphere(World, WarpLocation, 15.f, 12, FColor::Green, false, 1.5f);
+		DrawDebugDirectionalArrow(World, WarpLocation, WarpLocation + Direction * 60.f, 20.f, FColor::Green, false, 1.5f, 0, 2.f);
+	}
 }
 
 void UGA_MeleeAttack::TryAdvanceCombo()
@@ -256,6 +319,15 @@ void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
 			Character->OnInputBuffered.Remove(InputBufferedHandle);
 		}
 		InputBufferedHandle.Reset();
+	}
+
+	// 다음 활성화에 지난 공격의 워핑 목표가 남지 않도록
+	if (ACombatCharacterBase* Character = GetCombatCharacter())
+	{
+		if (UMotionWarpingComponent* MotionWarping = Character->GetMotionWarping())
+		{
+			MotionWarping->RemoveWarpTarget(WarpTargetName);
+		}
 	}
 
 	CurrentAttack = nullptr;

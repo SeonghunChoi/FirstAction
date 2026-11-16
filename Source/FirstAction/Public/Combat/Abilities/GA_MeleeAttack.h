@@ -41,6 +41,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
+	// 공격 몽타주의 Motion Warping 구간이 쓰는 목표 이름 (Step 6-2, CLAUDE.md 5.1 이름 규약)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Motion Warping")
+	FName WarpTargetName = TEXT("AttackTarget");
+
 private:
 	// 판정이 대상을 맞힘 (Event.Hit) → 피해 이펙트 적용, 히트스톱, 맞은 쪽에 Event.HitReact, 때린 쪽 Cue (Step 6-1)
 	// Step 6-4에서 이 사이에 타격 해석 매니저(UHitResolveSubsystem)가 들어간다(설계 규칙 6)
@@ -52,6 +56,11 @@ private:
 	const UAttackDataAsset* ResolveStartAttack() const;
 
 	ACombatCharacterBase* GetCombatCharacter() const;
+
+	// 캐릭터에 공격 대상을 묻고 워핑 목표를 등록한다. 몽타주를 재생할 때마다(콤보 타마다) 부른다 (Step 6-2)
+	// 목표: 대상 쪽 방향, 몸끼리 닿는 위치(양쪽 캡슐 반지름 합)까지, 단 MaxWarpDistance를 넘지 않음
+	// 대상이 없으면 목표를 지워 원래 루트 모션대로 휘두른다
+	void UpdateWarpTarget();
 
 	// CurrentAttack의 몽타주를 재생한다. 이전 몽타주 태스크가 있으면 콜백을 떼고 정리한 뒤 교체한다
 	void PlayCurrentAttackMontage();

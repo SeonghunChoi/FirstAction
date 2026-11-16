@@ -17,6 +17,7 @@ class UGameplayEffect;
 class UPrimaryDataAsset;
 class UStaticMeshComponent;
 class UMeleeTraceComponent;
+class UMotionWarpingComponent;
 struct FGameplayEventData;
 
 // 시작할 때 부여할 어빌리티 한 줄. 같은 어빌리티 클래스를 다른 입력 태그로 여러 번 부여할 수 있다.
@@ -69,6 +70,13 @@ public:
 	UCombatAttributeSet* GetCombatAttributeSet() const { return CombatAttributeSet; }
 	UStaticMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 	UMeleeTraceComponent* GetMeleeTrace() const { return MeleeTrace; }
+	UMotionWarpingComponent* GetMotionWarping() const { return MotionWarping; }
+
+	// 공격 대상을 고른다 (Step 6-2). 공격 어빌리티가 콤보 타마다 묻는다. 없으면 nullptr
+	// MaxDistance: 공격 데이터의 MaxWarpDistance. 캐릭터는 공격을 모르고 이 거리만 받는다
+	// 기본 구현: 기준 방향(GetAttackTargetDirection) 원뿔 안, 몸끼리 간격이 MaxDistance 이하인 대상 중 각도가 가장 작은 대상
+	// 플레이어는 락온 중이면 락온 대상(6-14), AI는 쫓는 대상(Step 7)을 돌려주도록 재정의한다. 이 둘은 거리 밖이어도 돌려준다
+	virtual AActor* FindAttackTarget(float MaxDistance) const;
 
 	// 입력 태그로 어빌리티 실행을 요청한다. 플레이어 입력도 AI도 이 두 함수만 부른다(설계 규칙 1)
 	//   눌림: 짝인 어빌리티가 실행 중이 아니면 활성화를 시도하고, 실행 중이면 입력 눌림을 전달한다
@@ -115,6 +123,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Feel", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float HitStopTimeDilation = 1.f;
 
+	// 공격 대상 탐색 원뿔의 전체 각도 (Step 6-2). 기준 방향 좌우로 절반씩. 0이면 대상을 찾지 않는다(워핑 없음)
+	// 튜닝값이므로 블루프린트 기본값에서 정한다. 공격과 상관없이 캐릭터마다 하나(6-2 결정)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting", meta = (ClampMin = "0.0", ClampMax = "360.0", Units = "Degrees"))
+	float AttackTargetConeAngle = 0.f;
+
+	// 대상 탐색의 기준 방향. 이동 입력(플레이어의 스틱)이 있으면 그 방향, 없으면 캐릭터 정면 (6-2 결정)
+	// 이동 입력은 템플릿 Move가 카메라 기준으로 만든 월드 방향이다. AI는 이동 입력이 없으므로 정면이 된다
+	virtual FVector GetAttackTargetDirection() const;
+
 private:
 	// 맞은 쪽 통로: Event.HitReact를 받으면 EventMagnitude(멈춤 시간)만큼 스스로 히트스톱 (Step 6-1)
 	// 6-7의 GA_HitReact도 같은 이벤트를 받아 반응 몽타주를 재생한다. 히트스톱은 캐릭터, 반응은 어빌리티
@@ -150,6 +167,10 @@ private:
 	// 무기 판정 (Step 5-1)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMeleeTraceComponent> MeleeTrace;
+
+	// 모션 워핑 (Step 6-2). 공격 어빌리티가 워핑 목표를 등록하고, 몽타주의 Motion Warping 구간이 루트 모션을 보정한다
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMotionWarpingComponent> MotionWarping;
 
 	// 시작 어빌리티/이펙트를 두 번 부여하지 않도록
 	bool bStartupGranted = false;

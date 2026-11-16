@@ -50,6 +50,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Feel", meta = (ClampMin = "0.0", Units = "s"))
 	float HitStopDuration = 0.f;
 
+	// 모션 워핑 최대 거리 (Step 6-2). 타마다 이 거리 안에서 대상을 찾고, 대상 쪽으로 최대 이만큼 붙는다
+	// 대상이 더 멀면(락온, AI) 방향만 돌리고 이 거리까지만 붙는다. 0이면 워핑하지 않는다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Feel", meta = (ClampMin = "0.0", Units = "cm"))
+	float MaxWarpDistance = 0.f;
+
 	// 콤보 분기 (Step 4-3). 콤보 분기 정보는 여기에만 있다(설계 규칙 4)
 	// 몽타주의 Window.Combo 구간에서 목록의 입력이 들어오면 그 다음 공격으로 넘어간다. 비어 있으면 콤보 끝
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combo", meta = (TitleProperty = "InputTag"))

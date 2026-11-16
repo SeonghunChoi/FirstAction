@@ -13,6 +13,8 @@
 #include "Combat/MeleeTraceComponent.h"
 #include "FirstAction.h"
 #include "TimerManager.h"
+#include "EngineUtils.h"
+#include "MotionWarpingComponent.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
 {
@@ -29,6 +31,72 @@ ACombatCharacterBase::ACombatCharacterBase()
 	WeaponMesh->SetGenerateOverlapEvents(false);
 
 	MeleeTrace = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MeleeTrace"));
+
+	MotionWarping = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarping"));
+}
+
+FVector ACombatCharacterBase::GetAttackTargetDirection() const
+{
+	// 마지막 이동 틱에서 소비한 이동 입력. 스틱을 놓으면 0이 된다
+	const FVector InputDirection = GetLastMovementInputVector().GetSafeNormal2D();
+	return InputDirection.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : InputDirection;
+}
+
+AActor* ACombatCharacterBase::FindAttackTarget(float MaxDistance) const
+{
+	UWorld* World = GetWorld();
+	if (MaxDistance <= 0.f || AttackTargetConeAngle <= 0.f || !World)
+	{
+		return nullptr;
+	}
+
+	const FVector Origin = GetActorLocation();
+	const FVector Direction = GetAttackTargetDirection();
+	const float CosHalfCone = FMath::Cos(FMath::DegreesToRadians(AttackTargetConeAngle * 0.5f));
+	const float MyRadius = GetSimpleCollisionRadius();
+
+	ACombatCharacterBase* BestTarget = nullptr;
+	float BestCos = -2.f;
+	float BestGap = TNumericLimits<float>::Max();
+
+	// 전투 캐릭터 수는 많지 않으므로 전부 훑는다
+	for (TActorIterator<ACombatCharacterBase> It(World); It; ++It)
+	{
+		ACombatCharacterBase* Candidate = *It;
+		if (Candidate == this || Candidate->IsActorBeingDestroyed()
+			|| Candidate->AbilitySystemComponent->HasMatchingGameplayTag(CombatTags::State_Dead))
+		{
+			continue;
+		}
+		// 같은 편 제외는 적끼리 공존하는 Step 7에서 추가한다
+
+		// 거리는 몸끼리의 간격(중심 거리 − 양쪽 캡슐 반지름)으로 잰다. 워핑 목표 계산과 같은 기준
+		const FVector ToCandidate = Candidate->GetActorLocation() - Origin;
+		const float Gap = ToCandidate.Size2D() - MyRadius - Candidate->GetSimpleCollisionRadius();
+		if (Gap > MaxDistance)
+		{
+			continue;
+		}
+
+		const FVector ToCandidateDir = ToCandidate.GetSafeNormal2D();
+		const float Cos = ToCandidateDir.IsNearlyZero() ? 1.f : FVector::DotProduct(Direction, ToCandidateDir);
+		if (Cos < CosHalfCone)
+		{
+			continue;
+		}
+
+		// 각도 우선(코사인이 클수록 각도가 작다). 각도가 같으면 가까운 쪽
+		const bool bBetterAngle = Cos > BestCos + KINDA_SMALL_NUMBER;
+		const bool bSameAngleCloser = FMath::IsNearlyEqual(Cos, BestCos, KINDA_SMALL_NUMBER) && Gap < BestGap;
+		if (bBetterAngle || bSameAngleCloser)
+		{
+			BestTarget = Candidate;
+			BestCos = Cos;
+			BestGap = Gap;
+		}
+	}
+
+	return BestTarget;
 }
 
 UAbilitySystemComponent* ACombatCharacterBase::GetAbilitySystemComponent() const
