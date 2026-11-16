@@ -15,6 +15,8 @@
 #include "TimerManager.h"
 #include "EngineUtils.h"
 #include "MotionWarpingComponent.h"
+#include "Combat/CombatCharacterData.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
 {
@@ -264,6 +266,17 @@ bool ACombatCharacterBase::ConsumeBufferedInput(const FGameplayTagContainer& Acc
 void ACombatCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 질량의 정본은 캐릭터 데이터. 엔진 물리(충격, 물체 밀기)가 쓰는 무브먼트 Mass를 같은 값으로 맞춘다 (6-3 결정)
+	if (CharacterData)
+	{
+		GetCharacterMovement()->Mass = CharacterData->Mass;
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] 캐릭터 데이터 %s: 질량 %.0fkg"), *GetName(), *GetNameSafe(CharacterData), CharacterData->Mass);
+	}
+	else
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] CharacterData가 없습니다. 블루프린트 기본값에서 지정하세요 (타격 해석에 질량이 필요)"), *GetName());
+	}
 
 	MeleeTrace->SetWeaponMesh(WeaponMesh);
 	MeleeTrace->OnHit.AddUObject(this, &ACombatCharacterBase::HandleMeleeTraceHit);

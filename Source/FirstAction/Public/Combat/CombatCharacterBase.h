@@ -18,6 +18,7 @@ class UPrimaryDataAsset;
 class UStaticMeshComponent;
 class UMeleeTraceComponent;
 class UMotionWarpingComponent;
+class UCombatCharacterData;
 struct FGameplayEventData;
 
 // 시작할 때 부여할 어빌리티 한 줄. 같은 어빌리티 클래스를 다른 입력 태그로 여러 번 부여할 수 있다.
@@ -72,6 +73,9 @@ public:
 	UMeleeTraceComponent* GetMeleeTrace() const { return MeleeTrace; }
 	UMotionWarpingComponent* GetMotionWarping() const { return MotionWarping; }
 
+	// 몸의 성질 데이터 (Step 6-3). 타격 해석 매니저(6-4)가 양쪽 질량을 여기서 읽는다
+	const UCombatCharacterData* GetCharacterData() const { return CharacterData; }
+
 	// 공격 대상을 고른다 (Step 6-2). 공격 어빌리티가 콤보 타마다 묻는다. 없으면 nullptr
 	// MaxDistance: 공격 데이터의 MaxWarpDistance. 캐릭터는 공격을 모르고 이 거리만 받는다
 	// 기본 구현: 기준 방향(GetAttackTargetDirection) 원뿔 안, 몸끼리 간격이 MaxDistance 이하인 대상 중 각도가 가장 작은 대상
@@ -101,6 +105,10 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override;
+
+	// 이 캐릭터의 몸의 성질 (질량 등). 플레이어와 적이 같은 형식 (Step 6-3, 설계 규칙 6-3)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Data")
+	TObjectPtr<const UCombatCharacterData> CharacterData;
 
 	// 시작할 때 부여할 어빌리티와 그 입력 태그 (공격, 회피, 피격 반응 등)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Startup", meta = (TitleProperty = "InputTag"))

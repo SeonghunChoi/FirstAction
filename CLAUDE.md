@@ -161,7 +161,7 @@ Source/FirstAction/
 │   │   ├── CombatCharacterBase.h      // ASC 부착, 플레이어/적 공통
 │   │   ├── CombatAttributeSet.h       // Health, Poise
 │   │   ├── TrainingDummy.h            // 훈련 더미 (0이 되면 자동 리필). 템플릿 CombatDummy와 이름 충돌을 피함
-│   │   ├── CombatCharacterData.h      // 질량, 부위 반응 임계값, 반응 몽타주
+│   │   ├── CombatCharacterData.h      // 몸의 성질: 질량(6-3), 부위 반응 임계값(6-8), 반응 몽타주(6-7)
 │   │   ├── AttackDataAsset.h
 │   │   ├── HitResolveSubsystem.h      // FHitResolution, 간격 분배, 상대 충격량
 │   │   ├── PartialHitReactionComponent.h // 맞은 본 아래 물리 반응
@@ -374,8 +374,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-2: Motion Warping 플러그인(`.uproject`)과 `Build.cs` 모듈, 공격 데이터 `MaxWarpDistance`, `ACombatCharacterBase`의 `MotionWarping` 컴포넌트와 `virtual FindAttackTarget(MaxDistance)`(스틱 입력, 없으면 정면 기준, 전체 60° 원뿔, 각도 우선, 몸 간격 기준), `GA_MeleeAttack::UpdateWarpTarget`이 콤보 타마다 `AttackTarget` 등록(캡슐 반지름 합까지, 최대 거리 제한). 몽타주 4개에 Motion Warping(Skew Warp) 구간, 콘솔 `FirstAction.ShowWarpTarget 1`. 원거리 추격, 스틱 방향 선택, 콤보 중 대상 변경 확인 (2026-11-16)
 
+- [x] Step 6-3: `UCombatCharacterData : UPrimaryDataAsset`(`Mass` kg만), `ACombatCharacterBase::CharacterData`, `BeginPlay`에서 무브먼트 `Mass`로 복사. `Portfolio/Data/Characters/DA_Character_Player`, `DA_Character_TrainingDummy`(둘 다 80kg)를 각 블루프린트에 지정, 시작 로그 확인 (2026-11-16)
+
 ### 현재 위치
-- **Step 6-3** 시작 전: `UCombatCharacterData` (질량, 임계값), 플레이어와 더미에 지정
+- **Step 6-4** 시작 전: `UHitResolveSubsystem`, `FHitResolution` (간격 분배와 상대 충격량)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -400,6 +402,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
 - 2026-11-16: 히트스톱은 각자 건다(6-1). 공격 어빌리티는 자기 캐릭터에만 걸고, 맞은 쪽에는 게임플레이 이벤트로 멈춤 시간을 넘겨 스스로 건다
 - 2026-11-16: 타격 연출(카메라 흔들림, 타격음, 불꽃)은 GameplayCue로 한다(6-1). 게임 코드는 연출을 모르고, 연출 추가는 Cue 에셋만 고친다. 히트스톱은 Cue가 아니라 이벤트 경로
+- 2026-11-16: `UCombatCharacterData`에는 지금 `Mass`만 넣는다(6-3). 반응 관련 칸은 쓰는 스텝(6-7, 6-8)에서 추가하고, 조작감 값(입력 버퍼, 히트스톱 배율, 대상 원뿔)은 블루프린트 기본값에 둔다. `Mass`는 kg이고 정본이며, 시작할 때 캐릭터 무브먼트 `Mass`에 복사한다
 - 2026-11-16: 모션 워핑 대상은 캐릭터가 제공하고, 어빌리티는 캐릭터에 물어본다(6-2). 플레이어와 AI는 고르는 방법이 달라 각자 구현한다. 콤보 타마다 묻고, 락온이 아니면 캐릭터가 그때 다시 고른다. 플레이어는 스틱 입력 방향 우선, 스틱을 놓으면 캐릭터 정면 기준. 탐색 범위는 어빌리티가 공격 데이터의 `MaxWarpDistance`를 넘겨 묻는다. 범위 밖 대상(락온, AI)은 방향만 돌리고 최대 거리까지 붙으며, 붙는 간격은 양쪽 캡슐 반지름 합. 후보가 여럿이면 각도 우선, 원뿔(전체 60°)은 캐릭터에 하나
 - 2026-11-16: 연출 Cue는 맞힐 때마다 양쪽에서 발생한다(6-1). 때린 쪽 `GameplayCue.Hit.Dealt`(어빌리티가 자기 ASC에), 맞은 쪽 `GameplayCue.Hit.Taken`(`GE_Damage`). 흔들림 에셋은 `bSingleInstance`를 켜 여러 명을 맞혀도 쌓이지 않게 한다
 - 2026-11-16: 저 프레임 판정은 측정 결과만 기록한다(5-6). 10fps까지 누락이 없어 서브스텝 보간은 넣지 않고, 진단 로그를 남겨 Hit Window를 줄이거나 빠른 공격을 추가할 때(6-15) 다시 측정한다
