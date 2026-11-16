@@ -147,7 +147,7 @@
 | `HandGrip_R` (마네킹 스켈레톤에 원래 있는 소켓) | 검 부착 위치. `weapon_r`은 마네킹에 이미 같은 이름이 있고 손을 따라 움직이지 않아 쓰지 않는다 |
 | `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
 | `AttackTarget` (Motion Warping 목표 이름) | 공격 몽타주의 Motion Warping 구간 `Warp Target Name`. `GA_MeleeAttack`이 타마다 등록 |
-| `Window.Combo`, `Window.Cancel`, `State.Invulnerable` | `ANS_TagWindow`가 붙이는 태그 |
+| `Window.Combo`, `Window.Cancel`, `State.Invulnerable`, `State.Downed` | `ANS_TagWindow`가 붙이는 태그 (`State.Downed`는 넘어짐 몽타주의 누운 구간) |
 
 ---
 
@@ -162,9 +162,10 @@ Source/FirstAction/
 │   │   ├── CombatAttributeSet.h       // Health, Poise
 │   │   ├── TrainingDummy.h            // 훈련 더미 (0이 되면 자동 리필). 템플릿 CombatDummy와 이름 충돌을 피함
 │   │   ├── CombatCharacterData.h      // 몸의 성질: 질량(6-3), 부위 반응 임계값(6-8), 반응 몽타주(6-7)
+│   │   ├── HitReactionTypes.h         // 반응 단계 열거형 (움찔/경직/넘어짐/그로기)
 │   │   ├── AttackDataAsset.h
 │   │   ├── HitResolveSubsystem.h      // FHitResolution, 간격 분배, 상대 충격량, 전달용 타깃 데이터
-│   │   ├── CombatSettings.h           // 프로젝트 설정 "Combat": 세계 규칙 계수 (밀림, 경직치)
+│   │   ├── CombatSettings.h           // 프로젝트 설정 "Combat": 세계 규칙 계수 (밀림, 경직치, 반응 단계 경계)
 │   │   ├── PartialHitReactionComponent.h // 맞은 본 아래 물리 반응
 │   │   ├── MeleeTraceComponent.h
 │   │   ├── LockOnComponent.h
@@ -383,8 +384,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-6: `DA_Character_Dummy_Small`(40kg), `DA_Character_Dummy_Large`(300kg), 자식 블루프린트 `BP_TrainingDummy_Small`/`_Large`를 `Lvl_Training`에 배치(스케일 0.75/1.4). 세 질량 모두 밀림 거리 적당 → 기준값 유지, `Docs/Tuning.md`에 기록. 발견한 문제: `Heavy_Combo`(워핑 구간 4개)가 2타부터 낡은 목표로 워핑 → `UMotionWarpingComponent::OnPreUpdate`에서 구간 시작마다 대상 재질의로 수정, 확인 (2026-11-17)
 
+- [x] Step 6-7: `GA_HitReact`(`Event.HitReact`/`Event.Groggy` Ability Trigger, `ShouldAbilityRespondToEvent`로 공격 중 움찔·낮은 단계·누운 구간 거름, 같거나 높은 단계는 `bRetriggerInstancedAbility`로 처음부터, 경직 이상 `State.Staggered`, 그로기 `State.Groggy`, 그로기 끝에 `GE_RestorePoise`). `EHitReactionStage`, 매니저가 프로젝트 설정 경계값(250/700 cm/s)으로 `FHitResolution::ReactionStage`를 정함. `UCombatCharacterData`에 단계별 반응 몽타주와 `HeadRootBone`. `State.Downed` 태그, 공격은 `State.Staggered` 중 시작 불가, 더미 자동 리필은 체력만. 몽타주 `AM_UAL1_Hit_Chest`/`_Head`, `AM_UAL2_Hit_Knockback`(+`LayToIdle`, `State.Downed` 구간), `AM_UAL2_Idle_Shield_Break`(그로기), `BP_GA_HitReact`를 플레이어와 더미에 부여. 확인: 세 질량의 단계(Small 경직/넘어짐, 보통 경직/넘어짐, Large 움찔), 그로기 진입·차단·회복, 넘어짐 중 낮은 단계 유지. **미확인**: 누운 구간 반응 없음, 머리 몽타주(머리를 맞히지 못함), 공격 중 움찔 → Step 7에서 확인 (2026-11-17)
+
 ### 현재 위치
-- **Step 6-7** 시작 전: `GA_HitReact` (상대 충격량 기반 반응 단계, 방향별 반응, 경직치 0이면 그로기)
+- **Step 6-8** 시작 전: `UPartialHitReactionComponent` (임계값 이상일 때 맞은 본 아래 물리 반응)
+- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -409,6 +413,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
 - 2026-11-16: 히트스톱은 각자 건다(6-1). 공격 어빌리티는 자기 캐릭터에만 걸고, 맞은 쪽에는 게임플레이 이벤트로 멈춤 시간을 넘겨 스스로 건다
 - 2026-11-16: 타격 연출(카메라 흔들림, 타격음, 불꽃)은 GameplayCue로 한다(6-1). 게임 코드는 연출을 모르고, 연출 추가는 Cue 에셋만 고친다. 히트스톱은 Cue가 아니라 이벤트 경로
+- 2026-11-17: 맞은 쪽 히트스톱과 밀림은 캐릭터가 적용한다(6-7). 반응이 막혀도(가드, 그로기, 누움) 몸은 밀린다. `GA_HitReact`는 반응 몽타주와 상태 태그만 맡는다
+- 2026-11-17: 반응이 공격을 끊는지는 질량에 맡긴다(6-7). 움찔은 공격을 끊지 않고(몽타주 없이 히트스톱·밀림·Cue만), 경직 이상은 공격 몽타주를 끊는다. 큰 적의 슈퍼아머는 질량에서 저절로 생긴다
+- 2026-11-17: 반응 중 다시 맞으면 같거나 높은 단계는 처음부터, 낮은 단계는 유지(6-7). 누운 구간(`State.Downed`)과 그로기 중에는 반응 없음. 단 누운 구간에 경직치가 0이 되면 그로기는 들어간다
+- 2026-11-17: 반응 단계 경계값은 세계 규칙(프로젝트 설정 `Combat`), 매니저가 단계를 정해 `FHitResolution`에 싣는다. 반응 몽타주는 `UCombatCharacterData`, 머리/몸통은 맞은 본으로 고른다(6-7)
+- 2026-11-17: 그로기는 몽타주 길이로 끝나고, 끝날 때 `GE_RestorePoise`로 경직치를 채운다. 그로기 중에는 피해만. 훈련 더미 자동 리필은 체력만 본다(6-7)
 - 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다

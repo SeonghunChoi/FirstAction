@@ -37,6 +37,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// 이미 공격 중이면 다른 공격 스펙(약공격 중 강공격 버튼 등)이 따로 시작되지 않게 막는다
 	// 공격 중 입력은 입력 버퍼를 거쳐 이 어빌리티의 콤보 분기로 들어온다
 	ActivationBlockedTags.AddTag(CombatTags::State_Attacking);
+
+	// 경직(그로기, 넘어짐 포함) 중에는 공격을 시작하지 못한다 (6-7). 움찔은 태그가 없어 공격으로 끊고 나갈 수 있다
+	ActivationBlockedTags.AddTag(CombatTags::State_Staggered);
 }
 
 const UAttackDataAsset* UGA_MeleeAttack::ResolveStartAttack() const

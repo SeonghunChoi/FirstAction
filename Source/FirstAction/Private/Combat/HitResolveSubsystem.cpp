@@ -23,6 +23,24 @@ float UHitResolveSubsystem::GetMass(const AActor* Actor)
 	return FMath::Max(Data->Mass, 1.f);
 }
 
+EHitReactionStage UHitResolveSubsystem::GetReactionStage(float RelativeImpulse)
+{
+	const UCombatSettings* Settings = GetDefault<UCombatSettings>();
+	if (RelativeImpulse <= 0.f)
+	{
+		return EHitReactionStage::None;
+	}
+	if (RelativeImpulse >= Settings->KnockdownImpulseThreshold)
+	{
+		return EHitReactionStage::Knockdown;
+	}
+	if (RelativeImpulse >= Settings->StaggerImpulseThreshold)
+	{
+		return EHitReactionStage::Stagger;
+	}
+	return EHitReactionStage::Flinch;
+}
+
 FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) const
 {
 	const UCombatSettings* Settings = GetDefault<UCombatSettings>();
@@ -58,10 +76,13 @@ FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) cons
 
 	Result.PoiseDamage = Settings->PoiseDamagePerImpulse * Result.RelativeImpulse;
 
+	// 반응 단계도 같은 상대 충격량으로 정한다 (규칙 6-2, 6-7 결정: 경계값은 세계 규칙)
+	Result.ReactionStage = GetReactionStage(Result.RelativeImpulse);
+
 	UE_LOG(LogFirstAction, Log,
-		TEXT("[해석] %s → %s: 질량 %.0f→%.0fkg, 상대 충격량 %.0f, 간격 %.0f→%.0f, 맞은 쪽 밀림 %.0f, 때린 쪽 %s %.0f, 경직치 %.1f"),
+		TEXT("[해석] %s → %s: 질량 %.0f→%.0fkg, 상대 충격량 %.0f(%s), 간격 %.0f→%.0f, 맞은 쪽 밀림 %.0f, 때린 쪽 %s %.0f, 경직치 %.1f"),
 		*GetNameSafe(Input.Attacker), *GetNameSafe(Input.Victim),
-		GetMass(Input.Attacker), VictimMass, Result.RelativeImpulse,
+		GetMass(Input.Attacker), VictimMass, Result.RelativeImpulse, *UEnum::GetDisplayValueAsText(Result.ReactionStage).ToString(),
 		Result.InitialGap, Input.PostHitSpacing, Result.VictimDisplacement,
 		Result.AttackerDisplacement < 0.f ? TEXT("전진") : TEXT("후퇴"), FMath::Abs(Result.AttackerDisplacement),
 		Result.PoiseDamage);

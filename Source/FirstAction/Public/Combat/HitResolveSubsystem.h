@@ -11,6 +11,7 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbilityTargetTypes.h"
+#include "Combat/HitReactionTypes.h"
 #include "Engine/HitResult.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "HitResolveSubsystem.generated.h"
@@ -79,6 +80,10 @@ struct FHitResolution
 	// 상대 충격량 (cm/s) = 충격 ÷ 맞은 쪽 질량. 경직치, 반응 단계(6-7), 부위 반응(6-8)이 이 값을 쓴다 (규칙 6-2)
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
 	float RelativeImpulse = 0.f;
+
+	// 반응 단계. 상대 충격량을 세계 규칙 경계값(UCombatSettings)으로 나눈 결과 (6-7). 그로기는 여기서 나오지 않는다(Event.Groggy)
+	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
+	EHitReactionStage ReactionStage = EHitReactionStage::None;
 
 	// 맞은 쪽이 Direction으로 밀리는 거리 (cm) — 맞은 쪽이 적용 (6-5)
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
@@ -149,4 +154,7 @@ public:
 private:
 	// 캐릭터 데이터의 질량 (kg). 없으면 경고 후 기본값
 	static float GetMass(const AActor* Actor);
+
+	// 상대 충격량 → 반응 단계. 경계값은 프로젝트 설정 Combat > Hit Reaction (6-7)
+	static EHitReactionStage GetReactionStage(float RelativeImpulse);
 };

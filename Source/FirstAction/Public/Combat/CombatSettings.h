@@ -23,4 +23,15 @@ public:
 	// 공격 데이터의 임시 칸 PoiseDamage를 대신한다 (3-1, 5-4 결정)
 	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Hit Resolve", meta = (ClampMin = "0.0"))
 	float PoiseDamagePerImpulse = 0.f;
+
+	// 반응 단계 경계 (상대 충격량, cm/s). 모든 몸이 같은 기준을 쓰고, 버티는 정도는 질량이 정한다 (6-7 결정: 세계 규칙)
+	//   0 < I < StaggerImpulseThreshold          → 움찔
+	//   StaggerImpulseThreshold ≤ I < Knockdown  → 경직
+	//   KnockdownImpulseThreshold ≤ I            → 넘어짐
+	// 표시 단위가 m/s로 바뀌지 않도록 ForceUnits로 고정한다
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Hit Reaction", meta = (ClampMin = "0.0", ForceUnits = "cm/s"))
+	float StaggerImpulseThreshold = 0.f;
+
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Hit Reaction", meta = (ClampMin = "0.0", ForceUnits = "cm/s"))
+	float KnockdownImpulseThreshold = 0.f;
 };
