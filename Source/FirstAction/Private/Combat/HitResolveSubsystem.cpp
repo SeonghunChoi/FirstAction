@@ -1,0 +1,81 @@
+#include "Combat/HitResolveSubsystem.h"
+
+#include "Combat/CombatCharacterBase.h"
+#include "Combat/CombatCharacterData.h"
+#include "Combat/CombatSettings.h"
+#include "FirstAction.h"
+
+namespace
+{
+	// 캐릭터 데이터가 없을 때 쓰는 질량. 엔진 캐릭터 무브먼트의 기본값과 같다
+	constexpr float FallbackMass = 100.f;
+}
+
+float UHitResolveSubsystem::GetMass(const AActor* Actor)
+{
+	const ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(Actor);
+	const UCombatCharacterData* Data = Character ? Character->GetCharacterData() : nullptr;
+	if (!Data)
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[해석] %s에 CharacterData가 없어 질량 %.0fkg로 계산합니다"), *GetNameSafe(Actor), FallbackMass);
+		return FallbackMass;
+	}
+	return FMath::Max(Data->Mass, 1.f);
+}
+
+FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) const
+{
+	const UCombatSettings* Settings = GetDefault<UCombatSettings>();
+
+	FHitResolution Result;
+	Result.Attacker = Input.Attacker;
+	Result.Victim = Input.Victim;
+	Result.Hit = Input.Hit;
+	Result.PostHitSpacing = Input.PostHitSpacing;
+	Result.Damage = Input.Damage;
+	Result.AttackerHitStop = Input.HitStopDuration;
+	Result.VictimHitStop = Input.HitStopDuration;
+
+	if (!Input.Attacker || !Input.Victim)
+	{
+		return Result;
+	}
+
+	// 방향과 맞은 순간 간격: 수평, 몸끼리(중심 거리 − 양쪽 캡슐 반지름). 모션 워핑(6-2)과 같은 기준
+	const FVector ToVictim = (Input.Victim->GetActorLocation() - Input.Attacker->GetActorLocation()) * FVector(1.f, 1.f, 0.f);
+	const FVector Direction = ToVictim.GetSafeNormal();
+	Result.Direction = Direction.IsNearlyZero() ? Input.Attacker->GetActorForwardVector() : Direction;
+	Result.InitialGap = ToVictim.Size() - Input.Attacker->GetSimpleCollisionRadius() - Input.Victim->GetSimpleCollisionRadius();
+
+	// 상대 충격량: 여기서 한 번만 계산한다 (규칙 6-2)
+	const float VictimMass = GetMass(Input.Victim);
+	Result.RelativeImpulse = Input.ImpactForce / VictimMass;
+
+	// 맞은 쪽을 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지를 맞춘다 (6-4 결정)
+	Result.VictimDisplacement = Settings->KnockbackDistancePerImpulse * Result.RelativeImpulse;
+	Result.AttackerDisplacement = (Input.PostHitSpacing - Result.InitialGap) - Result.VictimDisplacement;
+
+	Result.PoiseDamage = Settings->PoiseDamagePerImpulse * Result.RelativeImpulse;
+
+	UE_LOG(LogFirstAction, Log,
+		TEXT("[해석] %s → %s: 질량 %.0f→%.0fkg, 상대 충격량 %.0f, 간격 %.0f→%.0f, 맞은 쪽 밀림 %.0f, 때린 쪽 %s %.0f, 경직치 %.1f"),
+		*GetNameSafe(Input.Attacker), *GetNameSafe(Input.Victim),
+		GetMass(Input.Attacker), VictimMass, Result.RelativeImpulse,
+		Result.InitialGap, Input.PostHitSpacing, Result.VictimDisplacement,
+		Result.AttackerDisplacement < 0.f ? TEXT("전진") : TEXT("후퇴"), FMath::Abs(Result.AttackerDisplacement),
+		Result.PoiseDamage);
+
+	return Result;
+}
+
+const FHitResolution* UHitResolveSubsystem::FindHitResolution(const FGameplayAbilityTargetDataHandle& TargetData)
+{
+	for (const TSharedPtr<FGameplayAbilityTargetData>& Data : TargetData.Data)
+	{
+		if (Data.IsValid() && Data->GetScriptStruct() == FGameplayAbilityTargetData_HitResolution::StaticStruct())
+		{
+			return &static_cast<const FGameplayAbilityTargetData_HitResolution*>(Data.Get())->Resolution;
+		}
+	}
+	return nullptr;
+}

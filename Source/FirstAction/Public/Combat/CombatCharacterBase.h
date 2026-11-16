@@ -141,7 +141,7 @@ protected:
 	virtual FVector GetAttackTargetDirection() const;
 
 private:
-	// 맞은 쪽 통로: Event.HitReact를 받으면 EventMagnitude(멈춤 시간)만큼 스스로 히트스톱 (Step 6-1)
+	// 맞은 쪽 통로: Event.HitReact의 타격 해석 결과(FHitResolution, 6-4)에서 자기 몫을 꺼내 스스로 적용 (Step 6-1)
 	// 6-7의 GA_HitReact도 같은 이벤트를 받아 반응 몽타주를 재생한다. 히트스톱은 캐릭터, 반응은 어빌리티
 	void HandleHitReactEvent(const FGameplayEventData* Payload);
 

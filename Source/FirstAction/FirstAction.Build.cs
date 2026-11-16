@@ -24,7 +24,9 @@ public class FirstAction : ModuleRules
 			"GameplayTags",
 			"GameplayTasks",
 			// 모션 워핑 (Step 6-2): 기반 캐릭터가 UMotionWarpingComponent를 가진다
-			"MotionWarping"
+			"MotionWarping",
+			// 프로젝트 설정 (Step 6-4): UCombatSettings가 UDeveloperSettings를 상속한다
+			"DeveloperSettings"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

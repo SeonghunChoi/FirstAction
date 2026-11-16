@@ -16,6 +16,7 @@
 #include "EngineUtils.h"
 #include "MotionWarpingComponent.h"
 #include "Combat/CombatCharacterData.h"
+#include "Combat/HitResolveSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
@@ -189,9 +190,11 @@ void ACombatCharacterBase::HandleMeleeTraceHit(const FHitResult& Hit)
 
 void ACombatCharacterBase::HandleHitReactEvent(const FGameplayEventData* Payload)
 {
-	if (Payload)
+	// 타격 해석 결과(6-4)에서 자기 몫만 꺼내 적용한다. 밀림(VictimDisplacement)은 Step 6-5에서 적용한다
+	const FHitResolution* Resolution = Payload ? UHitResolveSubsystem::FindHitResolution(Payload->TargetData) : nullptr;
+	if (Resolution)
 	{
-		ApplyHitStop(Payload->EventMagnitude);
+		ApplyHitStop(Resolution->VictimHitStop);
 	}
 }
 

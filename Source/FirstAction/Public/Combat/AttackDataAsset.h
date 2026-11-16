@@ -40,13 +40,19 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack", meta = (ClampMin = "0.0"))
 	float Damage = 0.f;
 
-	// [임시] 경직치 감소량 (Step 5-4). GE_Damage에 SetByCaller.PoiseDamage로 전달된다
-	// Step 6-4에서 매니저가 상대 충격량(충격 ÷ 맞는 쪽 질량)으로 계산하게 되면 이 칸은 삭제한다
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Temporary", meta = (ClampMin = "0.0"))
-	float PoiseDamage = 0.f;
+	// 충격량 (kg·cm/s, Step 6-4). 방향은 때린 쪽 → 맞은 쪽 수평
+	// 타격 해석 매니저가 맞은 쪽 질량으로 나눠 상대 충격량을 만들고, 밀림 거리와 경직치 감소량을 정한다
+	// (5-4의 임시 칸 PoiseDamage는 이 계산으로 대체되어 삭제했다)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Impact", meta = (ClampMin = "0.0"))
+	float ImpactForce = 0.f;
+
+	// 타격 후 몸끼리의 간격 (cm, Step 6-4). 간격은 이 칸에만 있다(설계 규칙 6-1)
+	// 콤보 중간 타는 짧게(다음 타 범위 안), 마무리 타는 길게
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Impact", meta = (ClampMin = "0.0", Units = "cm"))
+	float PostHitSpacing = 0.f;
 
 	// 히트스톱 시간 (Step 6-1). 맞힌 순간 때린 쪽과 맞은 쪽이 각자 이만큼 멈춘다
-	// 맞은 쪽에는 Event.HitReact의 EventMagnitude로 전달된다. 6-4부터는 매니저가 양쪽 값을 따로 정할 수 있다
+	// 타격 해석 매니저(6-4)가 양쪽 값(AttackerHitStop, VictimHitStop)을 정하고, 맞은 쪽에는 FHitResolution으로 전달된다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Feel", meta = (ClampMin = "0.0", Units = "s"))
 	float HitStopDuration = 0.f;
 

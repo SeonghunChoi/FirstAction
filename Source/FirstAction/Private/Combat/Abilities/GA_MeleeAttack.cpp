@@ -10,6 +10,7 @@
 #include "Combat/AttackDataAsset.h"
 #include "Combat/CombatCharacterBase.h"
 #include "Combat/CombatTags.h"
+#include "Combat/HitResolveSubsystem.h"
 #include "FirstAction.h"
 #include "DrawDebugHelpers.h"
 #include "HAL/IConsoleManager.h"
@@ -241,20 +242,33 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 		return;
 	}
 
+	UHitResolveSubsystem* Resolver = GetWorld() ? GetWorld()->GetSubsystem<UHitResolveSubsystem>() : nullptr;
 	FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
-	if (!SpecHandle.IsValid())
+	if (!Resolver || !SpecHandle.IsValid())
 	{
 		return;
 	}
 
-	// 피해량은 공격 데이터에서. GE_Damage는 Health에 이 값을 더하므로 음수로 넘긴다
-	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_Damage, -CurrentAttack->Damage);
+	// --- 타격 해석 (Step 6-4). 어빌리티는 공격 데이터의 값과 판정 결과를 넘기기만 한다 (규칙 6) ---
+	const FHitResult* Hit = Payload.TargetData.Get(0) ? Payload.TargetData.Get(0)->GetHitResult() : nullptr;
 
-	// 경직치 감소량. 지금은 공격 데이터의 임시 칸, Step 6-4부터는 매니저가 계산한 값
-	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_PoiseDamage, -CurrentAttack->PoiseDamage);
+	FHitResolveInput Input;
+	Input.Attacker = GetAvatarActorFromActorInfo();
+	Input.Victim = Target;
+	Input.Hit = Hit ? *Hit : FHitResult();
+	Input.ImpactForce = CurrentAttack->ImpactForce;
+	Input.PostHitSpacing = CurrentAttack->PostHitSpacing;
+	Input.Damage = CurrentAttack->Damage;
+	Input.HitStopDuration = CurrentAttack->HitStopDuration;
 
-	// 판정 결과(맞은 위치, 본)를 이펙트 컨텍스트에 함께 싣는다. 피격 이펙트, 반응에서 꺼내 쓸 수 있다
-	if (const FHitResult* Hit = Payload.TargetData.Get(0) ? Payload.TargetData.Get(0)->GetHitResult() : nullptr)
+	const FHitResolution Resolution = Resolver->Resolve(Input);
+
+	// 피해와 경직치는 매니저가 정한 값. GE_Damage는 속성에 이 값을 더하므로 음수로 넘긴다 (규칙 5)
+	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_Damage, -Resolution.Damage);
+	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_PoiseDamage, -Resolution.PoiseDamage);
+
+	// 판정 결과(맞은 위치, 본)를 이펙트 컨텍스트에 함께 싣는다. 연출 Cue가 맞은 위치로 쓴다 (6-1)
+	if (Hit)
 	{
 		SpecHandle.Data->GetContext().AddHitResult(*Hit, true);
 	}
@@ -264,24 +278,22 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 피해: %s → %s (체력 %.1f, 경직치 %.1f)"),
 		*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target),
-		CurrentAttack->Damage, CurrentAttack->PoiseDamage);
+		Resolution.Damage, Resolution.PoiseDamage);
 
-	// --- 히트스톱과 연출 (Step 6-1). 각자 자기 것만 적용한다 ---
+	// --- 결과 적용. 각자 자기 몫만 (규칙 6) ---
 
-	// 때린 쪽: 자기 캐릭터에만 히트스톱
+	// 때린 쪽: 자기 히트스톱. 자기 이동(AttackerDisplacement)은 Step 6-5에서 적용한다
 	if (ACombatCharacterBase* Character = GetCombatCharacter())
 	{
-		Character->ApplyHitStop(CurrentAttack->HitStopDuration);
+		Character->ApplyHitStop(Resolution.AttackerHitStop);
 	}
 
-	// 맞은 쪽: 멈춤 시간을 이벤트로 넘긴다. 받은 쪽이 스스로 히트스톱을 건다 (6-7부터 GA_HitReact도 이 이벤트를 받는다)
-	// Step 6-4부터는 매니저가 계산한 맞은 쪽 값이 이 자리에 들어간다
+	// 맞은 쪽: 해석 결과 전체를 전용 타깃 데이터로 실어 보낸다 (6-4 결정). 받은 쪽이 자기 몫(히트스톱, 6-5 밀림, 6-7 반응)을 적용한다
 	FGameplayEventData ReactPayload;
 	ReactPayload.EventTag = CombatTags::Event_HitReact;
 	ReactPayload.Instigator = GetAvatarActorFromActorInfo();
 	ReactPayload.Target = Target;
-	ReactPayload.EventMagnitude = CurrentAttack->HitStopDuration;
-	ReactPayload.TargetData = Payload.TargetData;
+	ReactPayload.TargetData.Add(new FGameplayAbilityTargetData_HitResolution(Resolution));
 	ReactPayload.ContextHandle = SpecHandle.Data->GetContext();
 	TargetASC->HandleGameplayEvent(ReactPayload.EventTag, &ReactPayload);
 
