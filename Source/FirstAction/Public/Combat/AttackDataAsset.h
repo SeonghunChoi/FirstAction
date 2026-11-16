@@ -6,9 +6,24 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "AttackDataAsset.generated.h"
 
 class UAnimMontage;
+class UAttackDataAsset;
+
+// 콤보 분기 하나: 콤보 구간에서 이 입력이 들어오면 다음 공격으로 넘어간다 (Step 4-3)
+USTRUCT(BlueprintType)
+struct FAttackComboLink
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combo", meta = (Categories = "InputTag"))
+	FGameplayTag InputTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combo")
+	TObjectPtr<UAttackDataAsset> NextAttack;
+};
 
 UCLASS(BlueprintType, Const)
 class FIRSTACTION_API UAttackDataAsset : public UPrimaryDataAsset
@@ -20,4 +35,9 @@ public:
 	// 판정, 콤보, 캔슬 구간의 타이밍은 C++가 아니라 이 몽타주의 노티파이가 가진다(설계 규칙 3)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	TObjectPtr<UAnimMontage> Montage;
+
+	// 콤보 분기 (Step 4-3). 콤보 분기 정보는 여기에만 있다(설계 규칙 4)
+	// 몽타주의 Window.Combo 구간에서 목록의 입력이 들어오면 그 다음 공격으로 넘어간다. 비어 있으면 콤보 끝
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combo", meta = (TitleProperty = "InputTag"))
+	TArray<FAttackComboLink> ComboLinks;
 };

@@ -348,8 +348,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 4-2: `ACombatCharacterBase` 입력 버퍼(새 어빌리티를 시작하지 못한 입력만 기록, 최근 1개, `ConsumeBufferedInput`은 받는 태그만 꺼내고 나머지는 남김), `InputBufferDuration` 플레이어 0.3초 (2026-11-16)
 
+- [x] Step 4-3/4-4: `UAttackDataAsset::ComboLinks {InputTag, NextAttack}`, 캐릭터 `OnInputBuffered` 알림, `GA_MeleeAttack`이 `Window.Combo` 열림/버퍼 기록 두 시점에서 `TryAdvanceCombo` → 같은 실행 안에서 몽타주 교체(이전 태스크 콜백 해제 후 `EndTask`). 짧은 UAL2 클립은 블렌드 아웃이 구간을 잡아먹어, 몽타주에 `_Rec` 회복 클립을 이어 붙이고 `Window.Combo`를 휘두르기 끝 ~ 회복 앞쪽에 둠. `Light_01/02` → `Light_02/03`, `Heavy_01` 분기 (2026-11-16)
+- [x] ✅ Step 4 마일스톤: 약-약-약, 약-약-강 분기 콤보가 자연스럽게 이어지고, 콤보 전체에서 어빌리티 종료는 한 번 (2026-11-16)
+
 ### 현재 위치
-- **Step 4-3** 시작 전: `ComboLinks`로 다음 공격 결정 (4-4 설계 판단 포함)
+- **Step 5-1** 시작 전: `UMeleeTraceComponent` (소켓 쌍 스윕, 한 휘두름 한 번 피격)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -372,6 +375,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-15: 플레이어 클래스는 템플릿 `AFirstActionCharacter`를 고쳐 쓴다. 부모만 `ACharacter` → `ACombatCharacterBase`로 바꾸고, `BP_ThirdPersonCharacter`는 그대로 쓴다. 플레이어 전용 코드(입력 → 어빌리티, 락온)는 이 클래스에 추가한다
 - 2026-11-15: 어빌리티와 입력 태그의 짝은 부여 목록(`{어빌리티, 입력 태그}`)에 둔다. 같은 `GA_MeleeAttack`을 약공격·강공격 두 입력에 묶어야 하기 때문
 - 2026-11-15: `UAttackDataAsset`의 칸은 쓰는 스텝에서 하나씩 추가한다. 이름·타입을 바꾸면 이미 입력한 값이 사라지므로, 의미가 정해지기 전의 칸은 미리 넣지 않는다
+- 2026-11-16: 콤보는 같은 `GA_MeleeAttack` 실행 안에서 `CurrentAttack`과 몽타주를 바꿔 이어 간다 (4-4). 새로 활성화 방식은 스펙 중복 반응과 `State.Attacking` 공백 문제로 쓰지 않는다
 - 2026-11-16: 입력 버퍼는 캐릭터(입력 요청 입구 `AbilityInputTagPressed`)에 둔다. 실행 중인 어빌리티가 꺼내 간다. 다른 스펙의 입력과 회피 선입력도 같은 버퍼로 처리
 - 2026-11-16: 입력 버퍼 보관 시간은 캐릭터마다 하나(`InputBufferDuration`). 공격 데이터에 두지 않는다
 - 2026-11-16: 깃 버전 검 메시는 Modeling Tools로 만든 임시 검(`SM_Sword_Placeholder`). 기능 구현 수준 기준이고, 소켓 이름만 지키면 메시는 나중에 교체 가능

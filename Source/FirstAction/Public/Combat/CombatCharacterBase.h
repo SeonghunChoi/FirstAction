@@ -35,6 +35,9 @@ struct FCombatAbilityGrant
 	TObjectPtr<UPrimaryDataAsset> AbilityData;
 };
 
+// 입력이 버퍼에 기록될 때 알린다. 실행 중인 어빌리티가 구간 안에서 바로 꺼내 가는 데 쓴다 (Step 4-3)
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatInputBuffered, const FGameplayTag& /*InputTag*/);
+
 // 입력 버퍼에 보관 중인 입력 하나 (Step 4-2)
 USTRUCT(BlueprintType)
 struct FCombatBufferedInput
@@ -72,6 +75,9 @@ public:
 	// 보관 시간 안에 들어왔고 AcceptedInputTags 중 하나이면 OutInputTag에 담고 버퍼를 비운 뒤 true.
 	// 받아들일 수 없는 입력(예: 공격 콤보 구간에서의 회피 입력)은 다른 소비자를 위해 버퍼에 남긴다
 	bool ConsumeBufferedInput(const FGameplayTagContainer& AcceptedInputTags, FGameplayTag& OutInputTag);
+
+	// 입력이 버퍼에 기록된 직후 호출된다
+	FOnCombatInputBuffered OnInputBuffered;
 
 protected:
 	virtual void BeginPlay() override;

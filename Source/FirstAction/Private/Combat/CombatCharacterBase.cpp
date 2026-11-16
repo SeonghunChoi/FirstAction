@@ -99,6 +99,8 @@ void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
 	BufferedInput.PressedTime = GetWorld()->GetTimeSeconds();
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 버퍼 기록: %s"), *GetName(), *InputTag.ToString());
+
+	OnInputBuffered.Broadcast(InputTag);
 }
 
 bool ACombatCharacterBase::ConsumeBufferedInput(const FGameplayTagContainer& AcceptedInputTags, FGameplayTag& OutInputTag)
