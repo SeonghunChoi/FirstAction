@@ -353,8 +353,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 5-1: `UMeleeTraceComponent`(`BeginTrace`/`EndTrace`, `TG_PostUpdateWork` 틱, 칼날 위 N점의 이전→현재 구체 스윕, Pawn만, 한 휘두름 한 번 `OnHit`, 콘솔 `FirstAction.ShowMeleeTrace 1`), `ACombatCharacterBase`에 `WeaponMesh`(HandGrip_R, NoCollision)와 `MeleeTrace`. BP의 `Weapon`을 `WeaponMesh`로 이전. 실제 스윕 확인은 5-2 (2026-11-16)
 
+- [x] Step 5-2: `UANS_HitWindow`(구간 동안 소유 액터의 `UMeleeTraceComponent`를 `FindComponentByClass`로 찾아 Begin/EndTrace, 구간 하나 = 한 휘두름). 공격 몽타주 4개에 배치(`Heavy_Combo`는 휘두를 때마다 하나씩), `FirstAction.ShowMeleeTrace 1`로 궤적이 칼을 따라감을 확인 (2026-11-16)
+
 ### 현재 위치
-- **Step 5-2** 시작 전: `ANS_HitWindow` (구간 동안 판정 켜기)
+- **Step 5-3** 시작 전: `Event.Hit` → `GE_Damage`(SetByCaller) 적용
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
