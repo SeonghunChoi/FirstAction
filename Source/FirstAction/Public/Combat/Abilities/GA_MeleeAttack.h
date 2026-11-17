@@ -15,6 +15,7 @@ class UAbilityTask_PlayMontageAndWait;
 class ACombatCharacterBase;
 class UGameplayEffect;
 class UMotionWarpingComponent;
+class URootMotionModifier;
 struct FGameplayEventData;
 
 UCLASS()
@@ -59,9 +60,12 @@ private:
 	ACombatCharacterBase* GetCombatCharacter() const;
 
 	// 캐릭터에 공격 대상을 묻고 워핑 목표를 등록한다 (Step 6-2)
-	// 목표: 대상 쪽 방향, 몸끼리 닿는 위치(양쪽 캡슐 반지름 합)까지, 단 MaxWarpDistance를 넘지 않음
+	// 목표: 대상 쪽 방향, 몸 간격이 StopGap이 되는 위치까지(0이면 몸이 닿는 위치), 단 MaxWarpDistance를 넘지 않음
 	// 대상이 없으면 목표를 지워 원래 루트 모션대로 휘두른다
-	void UpdateWarpTarget();
+	void UpdateWarpTarget(float StopGap);
+
+	// 이 워핑 구간이 시작되는 시점을 덮는 Attack Reach 노티파이의 멈출 간격. 없으면 0 (휘두름별 칼이 닿는 거리)
+	static float FindStopGap(const URootMotionModifier* Modifier);
 
 	// Motion Warping 구간이 시작될 때마다 대상을 다시 묻는다 (6-6에서 발견한 문제의 수정)
 	// 엔진이 새 구간의 수정자(modifier)를 만든 직후, 활성화하기 직전에 불린다. 한 몽타주에 여러 번 휘두르는 공격(Heavy_Combo)도 휘두름마다 새 목표를 쓴다

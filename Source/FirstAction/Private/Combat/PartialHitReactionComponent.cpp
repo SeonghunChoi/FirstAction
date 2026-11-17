@@ -20,12 +20,13 @@ UPartialHitReactionComponent::UPartialHitReactionComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
 
-	// FirstVR에서 쓰던 값에서 시작한다. 6-15에서 조정
+	// FirstVR 값(1000/100/1000/100)의 0.2배 (6-8 튜닝, Docs/Tuning.md)
+	// FirstVR 값은 충격을 3~4 물리 스텝 만에 지워, 흔들림이 히트스톱 동안 생겼다 사라져 보이지 않았다
 	PhysicalAnimationData.bIsLocalSimulation = false;
-	PhysicalAnimationData.OrientationStrength = 1000.f;
-	PhysicalAnimationData.AngularVelocityStrength = 100.f;
-	PhysicalAnimationData.PositionStrength = 1000.f;
-	PhysicalAnimationData.VelocityStrength = 100.f;
+	PhysicalAnimationData.OrientationStrength = 200.f;
+	PhysicalAnimationData.AngularVelocityStrength = 20.f;
+	PhysicalAnimationData.PositionStrength = 200.f;
+	PhysicalAnimationData.VelocityStrength = 20.f;
 
 	BlockedTags.AddTag(CombatTags::State_Downed);
 	BlockedTags.AddTag(CombatTags::State_Guarding);
@@ -103,13 +104,24 @@ void UPartialHitReactionComponent::ApplyPartialHit(FName HitBone, const FVector&
 	Mesh->SetAllBodiesBelowPhysicsBlendWeight(RootBone, 1.f);
 
 	// 맞은 바디에 속도 변화를 준다(bVelChange: 바디 질량과 무관). 부위의 나머지는 관절로 끌려간다
-	Mesh->AddImpulse(Velocity, HitBone, true);
+	// 맞은 본이 흔드는 부위 밖이면(골반을 맞아 대체 본 spine_01부터 흔드는 경우) 그 바디는 시뮬레이션하지 않아
+	// 충격이 무시되므로 부위 대표 본에 준다. 대표 본에 물리 바디가 없으면 부위 전체에 나눠 준다
+	const bool bHitInsidePart = HitBone == RootBone || Mesh->BoneIsChildOf(HitBone, RootBone);
+	const FName ImpulseBone = bHitInsidePart ? HitBone : RootBone;
+	if (Mesh->GetBodyInstance(ImpulseBone))
+	{
+		Mesh->AddImpulse(Velocity, ImpulseBone, true);
+	}
+	else
+	{
+		Mesh->AddImpulseToAllBodiesBelow(Velocity, RootBone, true);
+	}
 
 	ActiveReactions.Add(RootBone, 0.f);
 	SetComponentTickEnabled(true);
 
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] 부위 반응: 맞은 본 %s → 부위 %s, 속도 변화 %.0f"),
-		*GetNameSafe(GetOwner()), *HitBone.ToString(), *RootBone.ToString(), Velocity.Size());
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 부위 반응: 맞은 본 %s → 부위 %s, 충격 %s, 속도 변화 %.0f"),
+		*GetNameSafe(GetOwner()), *HitBone.ToString(), *RootBone.ToString(), *ImpulseBone.ToString(), Velocity.Size());
 }
 
 void UPartialHitReactionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

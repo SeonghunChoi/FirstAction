@@ -16,6 +16,8 @@
 #include "HAL/IConsoleManager.h"
 #include "MotionWarpingComponent.h"
 #include "RootMotionModifier.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Combat/Animation/ANS_AttackReach.h"
 
 namespace
 {
@@ -144,7 +146,28 @@ void UGA_MeleeAttack::PlayCurrentAttackMontage()
 	MontageTask->ReadyForActivation();
 }
 
-void UGA_MeleeAttack::UpdateWarpTarget()
+float UGA_MeleeAttack::FindStopGap(const URootMotionModifier* Modifier)
+{
+	// 워핑 구간이 시작되는 시점을 덮는 Attack Reach 노티파이를 같은 애니메이션(몽타주)에서 찾는다
+	const UAnimSequenceBase* Animation = Modifier ? Modifier->Animation.Get() : nullptr;
+	if (!Animation)
+	{
+		return 0.f;
+	}
+
+	for (const FAnimNotifyEvent& Event : Animation->Notifies)
+	{
+		const UANS_AttackReach* Reach = Cast<UANS_AttackReach>(Event.NotifyStateClass);
+		if (Reach && Event.GetTriggerTime() <= Modifier->StartTime + KINDA_SMALL_NUMBER
+			&& Modifier->StartTime < Event.GetEndTriggerTime())
+		{
+			return Reach->StopGap;
+		}
+	}
+	return 0.f;
+}
+
+void UGA_MeleeAttack::UpdateWarpTarget(float StopGap)
 {
 	ACombatCharacterBase* Character = GetCombatCharacter();
 	UMotionWarpingComponent* MotionWarping = Character ? Character->GetMotionWarping() : nullptr;
@@ -172,16 +195,17 @@ void UGA_MeleeAttack::UpdateWarpTarget()
 		return;
 	}
 
-	// 몸끼리 닿는 간격까지만, 그리고 최대 거리까지만 (6-2 결정). 이미 붙어 있으면 이동 0, 방향만 돌린다
+	// 몸 간격이 StopGap이 되는 곳까지만, 그리고 최대 거리까지만 (6-2 결정 + 휘두름별 멈출 간격)
+	// StopGap은 몽타주의 Attack Reach 노티파이 값, 없으면 0(몸이 닿는 거리). 이미 그보다 가까우면 이동 0, 방향만 돌린다
 	const float ContactSpacing = Character->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius();
-	const float MoveDistance = FMath::Clamp(ToTarget.Size() - ContactSpacing, 0.f, MaxWarpDistance);
+	const float MoveDistance = FMath::Clamp(ToTarget.Size() - ContactSpacing - StopGap, 0.f, MaxWarpDistance);
 	const FVector WarpLocation = From + Direction * MoveDistance;
 
 	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(WarpTargetName, WarpLocation, Direction.Rotation());
 
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s → %s (간격 %.0f, 이동 %.0f / 최대 %.0f)"),
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s → %s (간격 %.0f, 멈출 간격 %.0f, 이동 %.0f / 최대 %.0f)"),
 		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), *GetNameSafe(Target),
-		ToTarget.Size() - ContactSpacing, MoveDistance, MaxWarpDistance);
+		ToTarget.Size() - ContactSpacing, StopGap, MoveDistance, MaxWarpDistance);
 
 	if (CVarShowWarpTarget.GetValueOnGameThread())
 	{
@@ -208,7 +232,7 @@ void UGA_MeleeAttack::OnMotionWarpingPreUpdate(UMotionWarpingComponent* MotionWa
 			&& !RefreshedWarpModifiers.Contains(Modifier))
 		{
 			RefreshedWarpModifiers.Add(Modifier);
-			UpdateWarpTarget();
+			UpdateWarpTarget(FindStopGap(WarpModifier));
 			return;
 		}
 	}

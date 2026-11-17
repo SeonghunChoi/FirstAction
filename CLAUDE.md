@@ -146,7 +146,8 @@
 | `IK_`, `RTG_` 접두사 | IK Rig, IK Retargeter (`IK_UAL2`, `IK_Manny`, `RTG_UAL2_Manny`) |
 | `HandGrip_R` (마네킹 스켈레톤에 원래 있는 소켓) | 검 부착 위치. `weapon_r`은 마네킹에 이미 같은 이름이 있고 손을 따라 움직이지 않아 쓰지 않는다 |
 | `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
-| `AttackTarget` (Motion Warping 목표 이름) | 공격 몽타주의 Motion Warping 구간 `Warp Target Name`. `GA_MeleeAttack`이 타마다 등록 |
+| `AttackTarget` (Motion Warping 목표 이름) | 공격 몽타주의 Motion Warping 구간 `Warp Target Name`. `GA_MeleeAttack`이 구간 시작마다 등록 |
+| `Attack Reach` (`ANS_AttackReach`) | 워핑 구간 시작을 덮게 두는 휘두름별 멈출 간격(`StopGap` cm). 워핑 구간과 같은 몽타주에 둔다 |
 | `Window.Combo`, `Window.Cancel`, `State.Invulnerable`, `State.Downed` | `ANS_TagWindow`가 붙이는 태그 (`State.Downed`는 넘어짐 몽타주의 누운 구간) |
 
 ---
@@ -177,6 +178,7 @@ Source/FirstAction/
 │   │   │   └── GA_HitReact.h
 │   │   └── Animation/
 │   │       ├── ANS_TagWindow.h
+│   │       ├── ANS_AttackReach.h      // 휘두름별 워핑 멈출 간격 (데이터 전용)
 │   │       └── ANS_HitWindow.h
 │   ├── Input/
 │   │   └── CombatInputConfig.h        // 입력 액션 → 입력 태그
@@ -388,8 +390,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-8: `UPartialHitReactionComponent`(FirstVR 방식: `UPhysicalAnimationComponent` 월드 기준 당김, 부위 대표 본 아래 물리 + `bVelChange` 충격, 회복 시간 동안 블렌드 1→0, 누운 구간·가드에서 막음). 매니저가 `FHitResolution::PartialReactionVelocity` = 칼 방향 × (상대 충격량 − 200) × 0.5 계산. 캐릭터 데이터에 부위 대표 본(양팔, 양다리, `neck_01`, `spine_01`), 골반용 대체 본, 회복 시간 0.4초. 캐릭터가 C++로 두 컴포넌트를 만들고 메시 충돌만 `QueryAndPhysics`(프로필 유지). 부위별 반응 확인(pelvis→spine_01, hand_r→upperarm_r, head→neck_01). 발견한 문제: 너무 가까이 붙으면 `Heavy_Combo` 1타 궤적이 대상 뒤로 지나가 맞지 않음 (2026-11-17)
 
+- [x] Step 6-8 후속: 휘두름별 워핑 멈출 간격 `ANS_AttackReach`(`StopGap`, 데이터 전용 노티파이), `GA_MeleeAttack::FindStopGap`이 워핑 구간 시작 시점을 덮는 노티파이를 찾아 이동 거리 = 몸 간격 − `StopGap`(물러나지 않음). `Heavy_Combo` 1타에 `StopGap` 40cm. 간격 36에서 이동 0, 95/71/79에서 40cm까지 붙고 모두 명중 확인 (2026-11-17)
+- [x] Step 6-8 튜닝: 골반을 맞으면 시뮬레이션하지 않는 바디에 충격을 주던 빈틈 수정(부위 밖이면 대표 본에). 부위 반응이 보이지 않던 원인을 진단(충격은 들어가지만 FirstVR 당기는 힘이 3~4 물리 스텝 만에 지움) → 당기는 힘 0.2배(200/20/200/20), 계수 0.5 → 3.0. `Docs/Tuning.md`에 기록 (2026-11-17)
+
 ### 현재 위치
-- **Step 6-9** 시작 전: `GA_Dodge` (무적 구간, 공격 캔슬). 그 전에 `Heavy_Combo` 1타 근접 헛스윙 처리 여부 결정
+- **Step 6-9** 시작 전: `GA_Dodge` (무적 구간, 공격 캔슬)
 - Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지
 
 ### 결정 기록
@@ -423,6 +428,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 부위 반응 임계값과 세기 계수는 세계 규칙(프로젝트 설정 `Combat`, 반응 단계 경계와 별개)(6-8). 세기는 (상대 충격량 − 임계값) × 계수의 속도 변화, 방향은 칼이 지나간 방향. 매니저가 `FHitResolution::PartialReactionVelocity`로 싣는다
 - 2026-11-17: 부위 반응은 맞은 본에서 위로 가장 가까운 부위 대표 본부터 흔든다(6-8). 대표 본 목록, 골반용 대체 본, 회복 시간은 몸마다 `UCombatCharacterData`에 둔다
 - 2026-11-17: 부위 반응은 누운 구간과 가드에서만 막고 나머지(공격 중 움찔, 그로기)는 늘 준다(6-8). 캐릭터가 `Event.HitReact`에서 부르고, 막는 태그는 컴포넌트가 본다
+- 2026-11-17: 워핑이 멈출 간격은 휘두름마다 몽타주에 둔다(6-8에서 발견). 워핑 구간 시작을 덮는 별도 노티파이 `ANS_AttackReach`(`StopGap`)를 `GA_MeleeAttack`이 구간 시작에서 찾아 읽고, 없으면 몸이 닿는 거리. 이미 더 가까우면 물러나지 않는다
 - 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다
