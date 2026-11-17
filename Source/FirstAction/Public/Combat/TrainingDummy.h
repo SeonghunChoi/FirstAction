@@ -13,6 +13,19 @@
 
 struct FOnAttributeChangeData;
 
+// 훈련 더미의 시험용 방어 (6-12). 적 AI(Step 7) 전에 가드·패리 규칙을 플레이어 공격으로 시험하기 위한 것
+// 더미는 AI처럼 입력 태그로 어빌리티 활성화만 요청한다(규칙 1). 정면 각도 판정이 있으므로 더미를 플레이어 쪽으로 돌려 배치한다
+UENUM()
+enum class ETrainingDummyDefense : uint8
+{
+	// 방어하지 않음
+	None,
+	// 가드를 계속 올리고 있음. 가드가 깨지면(그로기) 다시 올린다 → 막는 판정(6-11) 시험
+	HoldGuard,
+	// 일정 간격으로 가드를 올렸다 바로 내림. 올리는 순간(Window.Parry)에 맞으면 플레이어 공격이 패리된다 → 패리(6-12) 시험
+	RepeatGuard
+};
+
 UCLASS()
 class FIRSTACTION_API ATrainingDummy : public ACombatCharacterBase
 {
@@ -29,10 +42,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Dummy", meta = (ClampMin = "0.0", Units = "s"))
 	float RefillDelay = 0.f;
 
+	// 시험용 방어 방식. 레벨에 놓은 더미마다 정한다 (규칙 9: 배치별 초기값)
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Combat|Dummy")
+	ETrainingDummyDefense DefenseMode = ETrainingDummyDefense::None;
+
+	// 방어 동작 간격 (초). HoldGuard는 가드가 깨졌는지 확인하는 간격, RepeatGuard는 가드를 다시 올리는 간격
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Combat|Dummy", meta = (ClampMin = "0.1", Units = "s"))
+	float DefenseInterval = 1.5f;
+
 private:
 	void OnHealthChanged(const FOnAttributeChangeData& ChangeData);
 	void Refill();
 
+	// DefenseMode에 따라 가드 입력을 요청한다
+	void TickDefense();
+
 	FTimerHandle RefillTimer;
+	FTimerHandle DefenseTimer;
 	FDelegateHandle HealthChangedHandle;
 };

@@ -328,6 +328,7 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	Input.Damage = CurrentAttack->Damage;
 	Input.HitStopDuration = CurrentAttack->HitStopDuration;
 	Input.MoveDuration = CurrentAttack->PostHitMoveDuration;
+	Input.AttackBone = CurrentAttack->AttackBone;
 
 	const FHitResolution Resolution = Resolver->Resolve(Input);
 
@@ -336,6 +337,18 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	{
 		UE_LOG(LogFirstAction, Log, TEXT("[%s] 회피됨: %s → %s (헛친 것으로 처리)"),
 			*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target));
+		return;
+	}
+
+	// 패리당함 (6-12): 방어자에게는 결과(긴 히트스톱, 가드의 Parry 구간)를, 자신에게는 되돌린 몫을 각자의 Event.HitReact로 보낸다
+	// 자기 반응(경직)이 이 공격의 몽타주를 끊어 어빌리티가 끝날 수 있으므로 마지막에 처리하고 바로 빠진다
+	if (Resolution.Outcome == EHitOutcome::Parried)
+	{
+		if (Hit)
+		{
+			SpecHandle.Data->GetContext().AddHitResult(*Hit, true);
+		}
+		HandleParried(Input, Resolution, Resolver, SpecHandle, SourceASC, TargetASC);
 		return;
 	}
 
@@ -382,6 +395,48 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	// 때린 쪽 연출: 자기 ASC에 Cue를 발생시킨다. 카메라가 있으면(로컬 플레이어면) 흔들리는지는 Cue 에셋이 판단한다(규칙 1)
 	// 컨텍스트에 판정 결과가 있으므로 Cue 쪽에서 맞은 위치를 쓸 수 있다
 	SourceASC->ExecuteGameplayCue(CombatTags::GameplayCue_Hit_Dealt, SpecHandle.Data->GetContext());
+}
+
+void UGA_MeleeAttack::HandleParried(const FHitResolveInput& Input, const FHitResolution& Resolution, const UHitResolveSubsystem* Resolver,
+	const FGameplayEffectSpecHandle& SpecHandle, UAbilitySystemComponent* SourceASC, UAbilitySystemComponent* TargetASC)
+{
+	AActor* Self = Input.Attacker;
+	const FGameplayEffectContextHandle Context = SpecHandle.Data->GetContext();
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 패리당함: %s → %s"), *GetNameSafe(Self), *GetNameSafe(CurrentAttack), *GetNameSafe(Input.Victim));
+
+	// 방어자: 피해 없음. 긴 히트스톱은 캐릭터가, Parry 구간 이동은 방어자의 GA_Guard가 이 이벤트로 적용한다 (규칙 6)
+	FGameplayEventData DefenderPayload;
+	DefenderPayload.EventTag = CombatTags::Event_HitReact;
+	DefenderPayload.Instigator = Self;
+	DefenderPayload.Target = Input.Victim;
+	DefenderPayload.TargetData.Add(new FGameplayAbilityTargetData_HitResolution(Resolution));
+	DefenderPayload.ContextHandle = Context;
+	TargetASC->HandleGameplayEvent(DefenderPayload.EventTag, &DefenderPayload);
+
+	// 연출: 전용 Cue를 양쪽에 (6-12 결정). 카메라 흔들림은 로컬 플레이어 쪽에서만 난다
+	TargetASC->ExecuteGameplayCue(CombatTags::GameplayCue_Hit_Parried, Context);
+	SourceASC->ExecuteGameplayCue(CombatTags::GameplayCue_Hit_Parried, Context);
+
+	// 자신(공격자): 되돌린 몫. 경직치는 같은 피해 경로(GE_Damage)로 자신에게, 반응·부위 반응·히트스톱은 자기 Event.HitReact로
+	const FHitResolution Recoil = Resolver->ResolveParryRecoil(Input, Resolution);
+
+	FGameplayEffectSpecHandle RecoilSpec = MakeOutgoingGameplayEffectSpec(DamageEffect, GetAbilityLevel());
+	if (RecoilSpec.IsValid())
+	{
+		RecoilSpec.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_Damage, 0.f);
+		RecoilSpec.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_PoiseDamage, -Recoil.PoiseDamage);
+		SourceASC->ApplyGameplayEffectSpecToSelf(*RecoilSpec.Data.Get());
+	}
+
+	FGameplayEventData RecoilPayload;
+	RecoilPayload.EventTag = CombatTags::Event_HitReact;
+	RecoilPayload.Instigator = Input.Victim;
+	RecoilPayload.Target = Self;
+	RecoilPayload.TargetData.Add(new FGameplayAbilityTargetData_HitResolution(Recoil));
+	RecoilPayload.ContextHandle = Context;
+	// 이 호출 안에서 반응 몽타주가 공격 몽타주를 끊어 이 어빌리티가 끝날 수 있다. 이 뒤로는 아무것도 하지 않는다
+	SourceASC->HandleGameplayEvent(RecoilPayload.EventTag, &RecoilPayload);
 }
 
 void UGA_MeleeAttack::OnComboWindowOpened()

@@ -143,7 +143,7 @@
 | `BP_GA_` 접두사 | C++ 어빌리티의 블루프린트 자식. 에셋 참조(이펙트 등)만 기본값으로 담는다 (`BP_GA_MeleeAttack`) |
 | `GE_`, `DA_` 접두사 | 게임플레이 이펙트, 데이터 에셋 |
 | `GCN_` 접두사 | GameplayCue Notify. 태그 이름을 따른다 (`GameplayCue.Hit.Dealt` → `GCN_Hit_Dealt`). `Portfolio/GameplayCues/`에만 둔다 (Cue 검색 경로) |
-| `Start`, `Loop`, `End` (몽타주 구간 이름) | 가드 몽타주: 올림(앞부분 `Window.Parry`) → 유지(반복) → 내림(뒷부분 `Window.Cancel`). `GA_Guard` 기본값과 같아야 한다 |
+| `Start`, `Loop`, `End`, `Parry` (몽타주 구간 이름) | 가드 몽타주: 올림(앞부분 `Window.Parry`) → 유지(반복) → 내림(뒷부분 `Window.Cancel`), 패리 성공 시 `Parry`(튕겨 낸 자세, `Window.Cancel`). `GA_Guard` 기본값과 같아야 한다 |
 | `IK_`, `RTG_` 접두사 | IK Rig, IK Retargeter (`IK_UAL2`, `IK_Manny`, `RTG_UAL2_Manny`) |
 | `HandGrip_R` (마네킹 스켈레톤에 원래 있는 소켓) | 검 부착 위치. `weapon_r`은 마네킹에 이미 같은 이름이 있고 손을 따라 움직이지 않아 쓰지 않는다 |
 | `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
@@ -401,9 +401,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-11: `GA_Guard`(누르는 동안 `State.Guarding`, 몽타주 `Start`/`Loop`/`End`, Start 중 떼면 Start를 마치고 End, End 캔슬 구간 전엔 다시 올릴 수 없음, 경직 중 막힘, 공격·회피·움찔·가드 중엔 캔슬 구간에서만). 매니저 `EHitOutcome::Guarded`(정면 `GuardAngle` 안이면 체력 0, 경직치·밀림·히트스톱 같음, 반응·부위 반응 없음). 맞은 쪽 Cue를 `GE_Damage`에서 빼고 공격 어빌리티가 결과별로 냄(`Hit.Taken`/`Hit.Guarded`). 캐릭터 `AddMovementInput` 재정의로 가드 중 회전만(`GuardTurnRate`), 눌린 입력 추적. `A_UAL2_Sword_Block`, `AM_UAL2_Sword_Block`, `GCN_Hit_Guarded`, 플레이어 `GuardAngle` 120·`GuardTurnRate` 360. 확인: 올림·유지·내림, 살짝 누르기, 연타 방지, 가드 중 회전, 가드에서 공격·회피 캔슬 (2026-11-17)
 
+- [x] Step 6-12: 매니저 `EHitOutcome::Parried`(`Window.Parry` + 정면 각도, 가드보다 우선, 방어자 결과 0, 히트스톱 × `ParryHitStopMultiplier` 2.0)와 `ResolveParryRecoil`(되돌린 상대 충격량 = 충격 ÷ 공격자 질량, 최소 경직, 경직치, `AttackBone` 부위 반응). `GA_MeleeAttack`이 방어자와 자신에게 각각 `Event.HitReact`, `Hit.Parried` 양쪽, 자기 경직치는 `GE_Damage`로. `GA_Guard`가 `Parried`면 `Parry` 구간으로. 공격 데이터 `AttackBone`(기본 `hand_r`). 가드 몽타주에 `Sword_Regular_B_Rec`를 이어 붙인 `Parry` 구간(반격 `Window.Cancel`), `GCN_Hit_Parried`. 훈련 더미 시험용 `DefenseMode`(`HoldGuard`, `RepeatGuard`). 확인: 패리 3회(공격자 경직·`upperarm_r` 부위 반응·히트스톱 0.12초, 방어자 `Parry` 구간), 가드 11회(체력 0), 가드 중 경직치 0 → 그로기로 가드 깨짐 → 회복 후 다시 가드 (2026-11-17)
+
 ### 현재 위치
-- **Step 6-12** 시작 전: 패리 규칙 (충격 반전, 공격자 `AttackBone` 부위 반응, 튕김 애니메이션, 경직)
-- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 6-9 무적(`Evaded`, 헛친 느낌), 경직 중 회피 금지, 6-11 막는 판정(`Guarded`, 정면 각도, `Hit.Guarded`, 경직치로 가드 깨짐)
+- **Step 6-13** 시작 전: 저스트 회피 규칙 (공격자는 공격 데이터대로 이동, 방어자는 회피 방향, 피해 없음)
+- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 6-9 무적(`Evaded`, 헛친 느낌), 경직 중 회피 금지, 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 적이 플레이어의 가드·패리에 막히는 경우
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -449,6 +451,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 맞은 쪽 Cue는 `GE_Damage`에서 빼서 공격 어빌리티가 결과에 따라 고른다(`Hit.Taken`/`Hit.Guarded`)(6-11). 피해 경로는 `GE_Damage` 하나
 - 2026-11-17: 가드 중에는 제자리에서 방향 전환만(6-11). 몽타주 `Start`/`Loop`/`End` 구간, 회전은 캐릭터 `AddMovementInput`이 `State.Guarding`이면 처리, 회전 속도 `GuardTurnRate`(BP 기본값)
 - 2026-11-17: 가드 중 공격·회피는 가드 몽타주의 캔슬 구간에서만(6-11)
+- 2026-11-17: 패리당한 공격자는 되돌린 상대 충격량(충격 ÷ 공격자 질량)으로 반응하되 최소 경직, 경직치도 되돌린 충격량만큼 깎인다(6-12). 방어자는 경직치 0. 매니저 `ResolveParryRecoil`이 공격자 몫을 만들고 공격자가 자기 `Event.HitReact`로 적용
+- 2026-11-17: 패리 순간 히트스톱은 `ParryHitStopMultiplier`(프로젝트 설정)배로 길게, 전용 `GameplayCue.Hit.Parried`를 양쪽에, 이동 없음(6-12)
+- 2026-11-17: 패리 성공 시 방어자 가드 몽타주가 `Parry` 구간으로 넘어가고, 그 구간의 `Window.Cancel`부터 반격(6-12). `Parry` 구간은 다른 애니메이션(깃 버전 `Sword_Regular_B_Rec`)을 가드 몽타주에 이어 붙여 성공 동작을 구분하고, `Window.Cancel`로 구간 전체를 덮는다
+- 2026-11-17: 적 AI 전 방어 시험용으로 훈련 더미에 배치별 `DefenseMode`(`HoldGuard`, `RepeatGuard`)(6-12)
 - 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다

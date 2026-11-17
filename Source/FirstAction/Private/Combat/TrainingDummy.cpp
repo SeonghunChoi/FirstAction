@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Combat/CombatAttributeSet.h"
+#include "Combat/CombatTags.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
@@ -28,6 +29,40 @@ void ATrainingDummy::BeginPlay()
 		HealthChangedHandle = ASC->GetGameplayAttributeValueChangeDelegate(UCombatAttributeSet::GetHealthAttribute())
 			.AddUObject(this, &ATrainingDummy::OnHealthChanged);
 	}
+
+	if (DefenseMode != ETrainingDummyDefense::None && GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(DefenseTimer, this, &ATrainingDummy::TickDefense, DefenseInterval, true, 0.1f);
+	}
+}
+
+void ATrainingDummy::TickDefense()
+{
+	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC)
+	{
+		return;
+	}
+
+	switch (DefenseMode)
+	{
+	case ETrainingDummyDefense::HoldGuard:
+		// 누른 채 떼지 않는다. 가드가 깨졌으면(가드 중이 아니면) 다시 누른다
+		if (!ASC->HasMatchingGameplayTag(CombatTags::State_Guarding))
+		{
+			AbilityInputTagPressed(CombatTags::InputTag_Guard);
+		}
+		break;
+
+	case ETrainingDummyDefense::RepeatGuard:
+		// 살짝 누르기: 가드를 올렸다(앞부분 Window.Parry) 바로 내린다
+		AbilityInputTagPressed(CombatTags::InputTag_Guard);
+		AbilityInputTagReleased(CombatTags::InputTag_Guard);
+		break;
+
+	default:
+		break;
+	}
 }
 
 void ATrainingDummy::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -40,6 +75,7 @@ void ATrainingDummy::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(RefillTimer);
+		World->GetTimerManager().ClearTimer(DefenseTimer);
 	}
 
 	Super::EndPlay(EndPlayReason);

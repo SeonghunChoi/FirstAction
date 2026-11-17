@@ -1,6 +1,8 @@
 #include "Combat/Abilities/GA_Guard.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Combat/HitResolveSubsystem.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/CombatCharacterBase.h"
@@ -59,6 +61,11 @@ void UGA_Guard::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	MontageTask->OnCancelled.AddDynamic(this, &UGA_Guard::OnMontageCancelled);
 	MontageTask->ReadyForActivation();
 
+	// 패리 성공은 공격자가 보낸 자기 Event.HitReact의 결과로 안다 (매니저 규칙, 6-12)
+	UAbilityTask_WaitGameplayEvent* WaitHitReact = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, CombatTags::Event_HitReact, nullptr, false, true);
+	WaitHitReact->EventReceived.AddDynamic(this, &UGA_Guard::OnHitReactEvent);
+	WaitHitReact->ReadyForActivation();
+
 	// 버퍼에서 늦게 시작되어 버튼이 이미 떼어져 있으면(살짝 누른 경우) 올렸다가 바로 내린다
 	const FGameplayAbilitySpec* Spec = GetCurrentAbilitySpec();
 	bool bHeld = false;
@@ -91,10 +98,10 @@ void UGA_Guard::LowerGuard()
 	}
 
 	const FName Current = AnimInstance->Montage_GetCurrentSection(GuardMontage);
-	if (Current == StartSection)
+	if (Current == StartSection || Current == ParrySection)
 	{
-		// 올리는 중: 패리 구간(Start 앞부분)을 자르지 않도록 Start를 끝까지 재생한 뒤 End로
-		AnimInstance->Montage_SetNextSection(StartSection, EndSection, GuardMontage);
+		// 올리는 중이거나 튕겨 낸 자세: 그 구간(패리 구간, 반격 구간)을 자르지 않도록 끝까지 재생한 뒤 End로
+		AnimInstance->Montage_SetNextSection(Current, EndSection, GuardMontage);
 	}
 	else if (Current == LoopSection)
 	{
@@ -103,6 +110,37 @@ void UGA_Guard::LowerGuard()
 	// End 중이면 이미 내리는 중
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 가드 내림 (현재 구간 %s)"), *GetNameSafe(GetAvatarActorFromActorInfo()), *Current.ToString());
+}
+
+void UGA_Guard::OnHitReactEvent(FGameplayEventData Payload)
+{
+	const FHitResolution* Resolution = UHitResolveSubsystem::FindHitResolution(Payload.TargetData);
+	UAnimInstance* AnimInstance = GetActorInfo().GetAnimInstance();
+	if (!IsActive() || !Resolution || Resolution->Outcome != EHitOutcome::Parried || !AnimInstance || !GuardMontage)
+	{
+		return;
+	}
+
+	// 튕겨 낸 자세로. 그 구간의 Window.Cancel부터 공격·회피로 반격할 수 있다 (6-12 결정)
+	AnimInstance->Montage_JumpToSection(ParrySection, GuardMontage);
+
+	// 버튼을 이미 뗐다면 Parry 구간 다음은 End
+	const FGameplayAbilitySpec* Spec = GetCurrentAbilitySpec();
+	const ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(GetAvatarActorFromActorInfo());
+	bool bHeld = false;
+	if (Character && Spec)
+	{
+		for (const FGameplayTag& InputTag : Spec->GetDynamicSpecSourceTags())
+		{
+			bHeld |= Character->IsInputTagHeld(InputTag);
+		}
+	}
+	if (!bHeld)
+	{
+		AnimInstance->Montage_SetNextSection(ParrySection, EndSection, GuardMontage);
+	}
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 패리 성공: %s 구간으로"), *GetNameSafe(Character), *ParrySection.ToString());
 }
 
 void UGA_Guard::EndAbility(const FGameplayAbilitySpecHandle Handle,

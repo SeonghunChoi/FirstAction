@@ -44,4 +44,8 @@ public:
 
 	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Partial Reaction", meta = (ClampMin = "0.0"))
 	float PartialReactionVelocityPerImpulse = 0.f;
+
+	// 패리 순간의 히트스톱 배율. 공격 데이터의 HitStopDuration에 곱해 양쪽에 건다 (6-12 결정: 패리는 더 길게)
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Defense", meta = (ClampMin = "1.0"))
+	float ParryHitStopMultiplier = 1.f;
 };

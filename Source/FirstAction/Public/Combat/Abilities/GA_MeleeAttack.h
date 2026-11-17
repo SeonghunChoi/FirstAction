@@ -15,6 +15,11 @@ class UAbilityTask_PlayMontageAndWait;
 class ACombatCharacterBase;
 class UGameplayEffect;
 class UMotionWarpingComponent;
+class UHitResolveSubsystem;
+struct FHitResolveInput;
+struct FHitResolution;
+struct FGameplayEffectSpecHandle;
+class UAbilitySystemComponent;
 class URootMotionModifier;
 struct FGameplayEventData;
 
@@ -52,6 +57,10 @@ private:
 	// 타격 해석 매니저(UHitResolveSubsystem)가 결과를 계산하고, 이 어빌리티는 때린 쪽 몫만 적용한다(설계 규칙 6, Step 6-4)
 	UFUNCTION()
 	void OnHitEvent(FGameplayEventData Payload);
+
+	// 이 공격이 패리당함 (6-12): 방어자 몫과 자기 몫(되돌린 충격)을 각자의 Event.HitReact로 보낸다. 끝에서 이 어빌리티가 끝날 수 있다
+	void HandleParried(const FHitResolveInput& Input, const FHitResolution& Resolution, const UHitResolveSubsystem* Resolver,
+		const FGameplayEffectSpecHandle& SpecHandle, UAbilitySystemComponent* SourceASC, UAbilitySystemComponent* TargetASC);
 
 	// 시작 공격 데이터를 정한다. 지금은 부여 건의 데이터(SourceObject)만 본다.
 	// AI용 이벤트 페이로드 경로는 Step 7에서 여기에 추가한다

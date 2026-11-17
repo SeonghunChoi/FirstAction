@@ -56,6 +56,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Impact", meta = (ClampMin = "0.0", Units = "s"))
 	float PostHitMoveDuration = 0.f;
 
+	// 공격하는 팔의 기준 본 (2026-11-14 결정, 6-12에서 추가). 이 공격이 패리당하면 공격자의 이 본에 되돌린 충격을 준다
+	// 부위 반응은 이 본이 속한 부위(마네킹: hand_r이면 upperarm_r 아래)를 흔든다. 기본값은 오른손에 검을 든 마네킹
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Impact")
+	FName AttackBone = TEXT("hand_r");
+
 	// 히트스톱 시간 (Step 6-1). 맞힌 순간 때린 쪽과 맞은 쪽이 각자 이만큼 멈춘다
 	// 타격 해석 매니저(6-4)가 양쪽 값(AttackerHitStop, VictimHitStop)을 정하고, 맞은 쪽에는 FHitResolution으로 전달된다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack|Feel", meta = (ClampMin = "0.0", Units = "s"))

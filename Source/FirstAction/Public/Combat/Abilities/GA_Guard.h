@@ -52,9 +52,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Guard")
 	FName EndSection = TEXT("End");
 
+	// 패리 성공 시 넘어가는 구간 (6-12 결정). 이 구간의 Window.Cancel부터 반격할 수 있다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Guard")
+	FName ParrySection = TEXT("Parry");
+
 private:
 	// Start 중이면 Start가 끝난 뒤 End로(패리 구간을 자르지 않음), Loop 중이면 바로 End로
 	void LowerGuard();
+
+	// 자기 Event.HitReact: 결과가 패리면 Parry 구간으로 넘어간다 (6-12)
+	UFUNCTION()
+	void OnHitReactEvent(FGameplayEventData Payload);
 
 	UFUNCTION()
 	void OnMontageFinished();

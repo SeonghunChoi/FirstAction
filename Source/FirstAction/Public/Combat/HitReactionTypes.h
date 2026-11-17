@@ -31,5 +31,8 @@ enum class EHitOutcome : uint8
 	// 무적(State.Invulnerable) 중이라 아무 결과도 없음. 때린 쪽도 헛친 것처럼 히트스톱·이동·연출이 없다
 	Evaded,
 	// 가드(State.Guarding, 정면 각도 안): 체력 피해 0, 경직치·밀림·히트스톱은 일반 타격과 같음, 반응 없음 (6-11)
-	Guarded
+	Guarded,
+	// 패리(Window.Parry, 정면 각도 안): 방어자는 피해·경직치·밀림·반응 없음, 히트스톱은 길게.
+	// 충격이 공격자에게 되돌아가 공격자가 AttackBone 부위 반응과 최소 경직으로 튕긴다 (6-12, 규칙 6-5)
+	Parried
 };

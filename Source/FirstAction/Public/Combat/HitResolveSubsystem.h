@@ -49,6 +49,10 @@ struct FHitResolveInput
 	// 타격 후 이동 시간 (초). 공격 데이터 값 (6-5)
 	UPROPERTY(BlueprintReadWrite, Category = "Hit Resolve")
 	float MoveDuration = 0.f;
+
+	// 공격하는 팔의 기준 본. 패리당했을 때 공격자 부위 반응 위치 (6-12)
+	UPROPERTY(BlueprintReadWrite, Category = "Hit Resolve")
+	FName AttackBone;
 };
 
 // 매니저 출력. 때린 쪽과 맞은 쪽이 각자 자기 칸만 적용한다 (규칙 6)
@@ -157,6 +161,11 @@ public:
 	// 한 번의 타격을 해석한다. 상태를 바꾸지 않는다
 	FHitResolution Resolve(const FHitResolveInput& Input) const;
 
+	// 패리된 타격(Outcome == Parried)에서 공격자가 받을 몫을 만든다 (6-12, 규칙 6-5)
+	// 맞은 쪽 = 공격자로 뒤집은 결과: 방향 반전, 되돌린 상대 충격량(ImpactForce / 공격자 질량)으로 경직치, 반응 단계(최소 경직), 부위 반응.
+	// 맞은 본 = AttackBone, 이동 없음, 히트스톱은 패리 값. 공격자는 이것을 자기 Event.HitReact로 받아 기존 경로로 적용한다
+	FHitResolution ResolveParryRecoil(const FHitResolveInput& Input, const FHitResolution& Parry) const;
+
 	// 이벤트 페이로드의 TargetData에서 타격 해석 결과를 찾는다. 없으면 nullptr (맞은 쪽, 6-5, 6-7에서 사용)
 	static const FHitResolution* FindHitResolution(const FGameplayAbilityTargetDataHandle& TargetData);
 
@@ -170,4 +179,7 @@ private:
 
 	// 상대 충격량 → 반응 단계. 경계값은 프로젝트 설정 Combat > Hit Reaction (6-7)
 	static EHitReactionStage GetReactionStage(float RelativeImpulse);
+
+	// 부위 반응 속도 변화: 방향 × (상대 충격량 − 임계값) × 계수, 임계값 이하면 0 (6-8)
+	static FVector GetPartialReactionVelocity(float RelativeImpulse, const FVector& Direction);
 };
