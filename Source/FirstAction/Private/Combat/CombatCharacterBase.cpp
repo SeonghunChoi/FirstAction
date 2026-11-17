@@ -15,6 +15,8 @@
 #include "TimerManager.h"
 #include "EngineUtils.h"
 #include "MotionWarpingComponent.h"
+#include "PhysicsEngine/PhysicalAnimationComponent.h"
+#include "Combat/PartialHitReactionComponent.h"
 #include "Combat/CombatCharacterData.h"
 #include "Combat/HitResolveSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -37,6 +39,9 @@ ACombatCharacterBase::ACombatCharacterBase()
 	MeleeTrace = CreateDefaultSubobject<UMeleeTraceComponent>(TEXT("MeleeTrace"));
 
 	MotionWarping = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarping"));
+
+	PhysicalAnimation = CreateDefaultSubobject<UPhysicalAnimationComponent>(TEXT("PhysicalAnimation"));
+	PartialHitReaction = CreateDefaultSubobject<UPartialHitReactionComponent>(TEXT("PartialHitReaction"));
 }
 
 FVector ACombatCharacterBase::GetAttackTargetDirection() const
@@ -191,12 +196,17 @@ void ACombatCharacterBase::HandleMeleeTraceHit(const FHitResult& Hit)
 
 void ACombatCharacterBase::HandleHitReactEvent(const FGameplayEventData* Payload)
 {
-	// 타격 해석 결과(6-4)에서 자기 몫만 꺼내 적용한다: 히트스톱과 밀림(6-5). 반응 몽타주는 6-7 GA_HitReact
+	// 타격 해석 결과(6-4)에서 자기 몫만 꺼내 적용한다: 히트스톱과 밀림(6-5), 부위 물리 반응(6-8). 반응 몽타주는 6-7 GA_HitReact
+	// 셋 다 몸에 생기는 물리 결과라 반응 어빌리티가 막혀도 적용한다(6-7, 6-8 결정). 부위 반응은 컴포넌트가 누운 구간·가드만 거른다
 	const FHitResolution* Resolution = Payload ? UHitResolveSubsystem::FindHitResolution(Payload->TargetData) : nullptr;
 	if (Resolution)
 	{
 		ApplyHitStop(Resolution->VictimHitStop);
 		ApplyHitDisplacement(Resolution->Direction, Resolution->VictimDisplacement, Resolution->MoveDuration);
+		if (PartialHitReaction && !Resolution->PartialReactionVelocity.IsNearlyZero())
+		{
+			PartialHitReaction->ApplyPartialHit(Resolution->Hit.BoneName, Resolution->PartialReactionVelocity);
+		}
 	}
 }
 

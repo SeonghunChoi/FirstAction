@@ -34,4 +34,14 @@ public:
 
 	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Hit Reaction", meta = (ClampMin = "0.0", ForceUnits = "cm/s"))
 	float KnockdownImpulseThreshold = 0.f;
+
+	// 부위 물리 반응 (6-8 결정: 세계 규칙, 반응 단계 경계와 별개)
+	//   맞은 바디의 속도 변화(cm/s) = (상대 충격량 − PartialReactionImpulseThreshold) × PartialReactionVelocityPerImpulse
+	//   방향은 칼이 지나간 방향. 임계값 이하이거나 계수가 0이면 반응 없음
+	// 초과분에 비례하므로 임계값을 막 넘긴 타격은 약하게 흔들린다 (임계값에서 갑자기 튀지 않음)
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Partial Reaction", meta = (ClampMin = "0.0", ForceUnits = "cm/s"))
+	float PartialReactionImpulseThreshold = 0.f;
+
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Partial Reaction", meta = (ClampMin = "0.0"))
+	float PartialReactionVelocityPerImpulse = 0.f;
 };

@@ -79,10 +79,24 @@ FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) cons
 	// 반응 단계도 같은 상대 충격량으로 정한다 (규칙 6-2, 6-7 결정: 경계값은 세계 규칙)
 	Result.ReactionStage = GetReactionStage(Result.RelativeImpulse);
 
+	// 부위 물리 반응: 임계값 초과분에 비례 (6-8 결정). 방향은 칼이 지나간 방향(판정 스윕의 이전 → 현재 위치)
+	// 칼이 거의 멈춘 채 맞아 방향을 알 수 없으면 해석 방향(때린 쪽 → 맞은 쪽)으로 대신한다
+	const float ExcessImpulse = Result.RelativeImpulse - Settings->PartialReactionImpulseThreshold;
+	if (ExcessImpulse > 0.f && Settings->PartialReactionVelocityPerImpulse > 0.f)
+	{
+		FVector SwingDirection = (Input.Hit.TraceEnd - Input.Hit.TraceStart).GetSafeNormal();
+		if (SwingDirection.IsNearlyZero())
+		{
+			SwingDirection = Result.Direction;
+		}
+		Result.PartialReactionVelocity = SwingDirection * (ExcessImpulse * Settings->PartialReactionVelocityPerImpulse);
+	}
+
 	UE_LOG(LogFirstAction, Log,
-		TEXT("[해석] %s → %s: 질량 %.0f→%.0fkg, 상대 충격량 %.0f(%s), 간격 %.0f→%.0f, 맞은 쪽 밀림 %.0f, 때린 쪽 %s %.0f, 경직치 %.1f"),
+		TEXT("[해석] %s → %s: 질량 %.0f→%.0fkg, 상대 충격량 %.0f(%s), 부위 반응 %.0f, 간격 %.0f→%.0f, 맞은 쪽 밀림 %.0f, 때린 쪽 %s %.0f, 경직치 %.1f"),
 		*GetNameSafe(Input.Attacker), *GetNameSafe(Input.Victim),
 		GetMass(Input.Attacker), VictimMass, Result.RelativeImpulse, *UEnum::GetDisplayValueAsText(Result.ReactionStage).ToString(),
+		Result.PartialReactionVelocity.Size(),
 		Result.InitialGap, Input.PostHitSpacing, Result.VictimDisplacement,
 		Result.AttackerDisplacement < 0.f ? TEXT("전진") : TEXT("후퇴"), FMath::Abs(Result.AttackerDisplacement),
 		Result.PoiseDamage);

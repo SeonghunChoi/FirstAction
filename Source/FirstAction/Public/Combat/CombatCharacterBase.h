@@ -18,6 +18,8 @@ class UPrimaryDataAsset;
 class UStaticMeshComponent;
 class UMeleeTraceComponent;
 class UMotionWarpingComponent;
+class UPhysicalAnimationComponent;
+class UPartialHitReactionComponent;
 class UCombatCharacterData;
 class UCharacterMovementComponent;
 struct FGameplayEventData;
@@ -73,6 +75,7 @@ public:
 	UStaticMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 	UMeleeTraceComponent* GetMeleeTrace() const { return MeleeTrace; }
 	UMotionWarpingComponent* GetMotionWarping() const { return MotionWarping; }
+	UPartialHitReactionComponent* GetPartialHitReaction() const { return PartialHitReaction; }
 
 	// 몸의 성질 데이터 (Step 6-3). 타격 해석 매니저(6-4)가 양쪽 질량을 여기서 읽는다
 	const UCombatCharacterData* GetCharacterData() const { return CharacterData; }
@@ -198,6 +201,14 @@ private:
 	// 모션 워핑 (Step 6-2). 공격 어빌리티가 워핑 목표를 등록하고, 몽타주의 Motion Warping 구간이 루트 모션을 보정한다
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarping;
+
+	// 물리 바디를 애니메이션 자세로 당긴다. 부위 반응이 흔드는 동안 쓴다 (Step 6-8)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicalAnimationComponent> PhysicalAnimation;
+
+	// 부위 물리 반응 (Step 6-8). 타격 해석 결과의 속도 변화를 맞은 부위에 준다
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPartialHitReactionComponent> PartialHitReaction;
 
 	// 시작 어빌리티/이펙트를 두 번 부여하지 않도록
 	bool bStartupGranted = false;

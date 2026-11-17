@@ -1,7 +1,7 @@
 // 캐릭터 한 종류의 몸의 성질을 담는 데이터. 플레이어와 적이 같은 형식을 쓴다. (PLAN 4.6, 설계 규칙 6-3)
 // 조작감 값(입력 버퍼, 히트스톱 배율, 대상 원뿔)은 여기가 아니라 캐릭터 블루프린트 기본값에 둔다(6-3 결정).
-// 칸은 쓰는 스텝에서 하나씩 추가한다: 반응 몽타주(6-7), 부위 반응 임계값(6-8).
-// 반응 단계 경계값은 몸이 아니라 세계 규칙이라 여기 두지 않는다(UCombatSettings, 6-7 결정).
+// 칸은 쓰는 스텝에서 하나씩 추가한다: 반응 몽타주(6-7), 부위 반응의 부위 본과 회복 시간(6-8).
+// 반응 단계 경계값과 부위 반응 임계값·세기는 몸이 아니라 세계 규칙이라 여기 두지 않는다(UCombatSettings, 6-7·6-8 결정).
 
 #pragma once
 
@@ -24,11 +24,32 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Body", meta = (ClampMin = "1.0", Units = "kg"))
 	float Mass = 100.f;
 
+	UCombatCharacterData();
+
 	// 반응 단계와 맞은 부위에 맞는 반응 몽타주를 고른다 (6-7)
 	// 머리 몽타주가 비어 있으면 몸통 몽타주를 쓴다. 단계에 몽타주가 없으면 nullptr
 	UAnimMontage* FindReactionMontage(EHitReactionStage Stage, const USkeletalMeshComponent* Mesh, FName HitBone) const;
 
+	// 부위 물리 반응을 시작할 본 (6-8). 맞은 본에서 위로 올라가며 가장 가까운 부위 대표 본,
+	// 없으면(골반, 루트처럼 모든 부위의 부모) PartialReactionFallbackBone
+	FName FindPartialReactionRootBone(const USkeletalMeshComponent* Mesh, FName HitBone) const;
+
+	float GetPartialReactionRecoverTime() const { return PartialReactionRecoverTime; }
+
 protected:
+	// 부위 대표 본. 이 본과 그 아래가 함께 흔들린다 (6-8 결정: 부위 단위, 스켈레톤마다 다르므로 몸의 데이터)
+	// 기본값은 마네킹: 양팔, 양다리, 머리, 상체
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Partial Reaction")
+	TArray<FName> PartialReactionRootBones;
+
+	// 어느 부위 대표 본의 아래도 아닌 본(골반 등)을 맞았을 때 흔들 부위
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Partial Reaction")
+	FName PartialReactionFallbackBone = TEXT("spine_01");
+
+	// 흔들린 부위가 애니메이션 자세로 완전히 돌아오는 시간 (6-8 결정: 몸마다)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Partial Reaction", meta = (ClampMin = "0.05", Units = "s"))
+	float PartialReactionRecoverTime = 0.4f;
+
 	// 움찔: 공격 중이 아닐 때만 재생한다 (공격 중이면 몽타주 없이 연출만, 6-7 결정)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Reaction")
 	TObjectPtr<UAnimMontage> FlinchMontage;

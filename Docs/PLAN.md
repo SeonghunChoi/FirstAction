@@ -191,7 +191,7 @@ flowchart LR
 **공통 캐릭터 데이터 (`UCombatCharacterData`)**
 
 - `Mass`: 플레이어와 적 모두 가진다
-- `PartialReactionThreshold`: 부위 반응을 주는 상대 충격량 기준
+- 부위 반응의 부위 대표 본 목록과 회복 시간 (6-8). 부위 반응 임계값·세기는 세계 규칙이라 프로젝트 설정 `Combat`에 둔다 (6-8 결정)
 - 반응 단계별 몽타주 (움찔·경직은 머리/몸통). 단계 기준값은 세계 규칙이라 프로젝트 설정 `Combat`에 둔다 (6-7 결정)
 
 **피격 반응 단계**
@@ -397,6 +397,12 @@ Content/
 | 반응 중 다시 맞음 (6-7) | 항상 리셋 / 단계 비교 | **결정 (2026-11-17)**: 같거나 높은 단계면 처음부터 다시(`bRetriggerInstancedAbility`), 낮으면 지금 반응 유지(`ShouldAbilityRespondToEvent`). 넘어짐 몽타주의 누운 구간(`State.Downed`, `ANS_TagWindow`)에는 반응 없음(피해와 밀림만). 단 누운 구간에 경직치가 0이 되면 그로기는 들어간다(그로기 이벤트는 한 번뿐이라 막으면 경직치가 회복되지 않음) |
 | 반응 단계 경계값과 반응 몽타주 위치 (6-7) | 프로젝트 설정 / 캐릭터 데이터 | **결정 (2026-11-17)**: 경계값(`StaggerImpulseThreshold`, `KnockdownImpulseThreshold`)은 세계 규칙으로 프로젝트 설정 `Combat`에 두고, 매니저가 상대 충격량으로 단계를 정해 `FHitResolution::ReactionStage`에 싣는다(규칙 6-2). 버티는 정도는 질량 하나가 정한다. 반응 몽타주는 몸마다 다르므로 `UCombatCharacterData`에 둔다(4.6 초안의 "기준값은 캐릭터 데이터"를 변경). 움찔·경직은 맞은 본이 `HeadRootBone`(기본 `neck_01`) 아래면 머리 몽타주 |
 | 그로기 지속과 회복 (6-7) | 몽타주 길이 / 데이터 시간. 끝날 때 채움 / 서서히 회복. 그로기 중 피격: 피해만 / 반응 | **결정 (2026-11-17)**: 그로기 몽타주 길이로 끝나고(규칙 3), 끝날 때(끊겨도) `GE_RestorePoise`로 경직치를 최대치까지 채운다(규칙 5). 그로기 중에는 피해만 받는다. 훈련 더미의 자동 리필은 체력만 본다 |
+| 부위 반응 임계값 위치 (6-8) | 프로젝트 설정 / 캐릭터 데이터. 반응 단계 경계 재사용 / 별도 값 | **결정 (2026-11-17)**: 세계 규칙(프로젝트 설정 `Combat`), 반응 단계 경계와 별개 값(`PartialReactionImpulseThreshold`). 4.6 초안의 `UCombatCharacterData::PartialReactionThreshold`를 변경. 버티는 정도는 질량 하나가 정한다(6-7과 같은 논리) |
+| 부위 반응 세기 (6-8) | 상대 충격량 그대로 / 계수 / 임계값 초과분 × 계수 | **결정 (2026-11-17)**: 맞은 바디의 속도 변화(cm/s, `bVelChange`) = (상대 충격량 − 임계값) × 계수. 계수(`PartialReactionVelocityPerImpulse`)는 프로젝트 설정. 임계값을 막 넘긴 타격이 갑자기 크게 흔들리지 않는다. 매니저가 계산해 `FHitResolution::PartialReactionVelocity`에 싣는다 |
+| 부위 반응 방향 (6-8) | 해석 방향(때린 쪽 → 맞은 쪽) / 칼이 지나간 방향 / 섞기 | **결정 (2026-11-17)**: 칼이 지나간 방향(판정 스윕의 TraceStart → TraceEnd). 세로 베기는 아래로, 가로 베기는 옆으로 흔들려 궤적이 보인다(규칙 3). 칼이 거의 멈춰 방향이 없으면 해석 방향 |
+| 부위 반응 범위 (6-8) | 맞은 본 그대로 / 위쪽 한계 / 부위 대표 본으로 올림 | **결정 (2026-11-17)**: 부위 대표 본으로 올린다. 맞은 본에서 위로 올라가 가장 가까운 대표 본(마네킹: `upperarm_l/r`, `thigh_l/r`, `neck_01`, `spine_01`)부터 흔든다. 목록은 스켈레톤마다 다르므로 `UCombatCharacterData`. 어느 대표 본 아래도 아닌 본(골반)은 `PartialReactionFallbackBone`(기본 `spine_01`) |
+| 부위 반응 회복 시간 (6-8) | 세계 규칙 / 몸마다 / 세기 비례 | **결정 (2026-11-17)**: 몸마다(`UCombatCharacterData::PartialReactionRecoverTime`). 질량은 "얼마나 흔들리나", 회복 시간은 "얼마나 빨리 추스르나"라는 다른 성질 |
+| 반응이 막힌 상태의 부위 반응 (6-8) | 늘 / 상태별로 막음 | **결정 (2026-11-17)**: 누운 구간(`State.Downed`)과 가드(`State.Guarding`)에서만 막고, 공격 중 움찔과 그로기를 포함해 나머지는 늘 준다. 히트스톱·밀림처럼 캐릭터가 `Event.HitReact`에서 부르고, 막는 태그는 컴포넌트가 본다 |
 | 타격 후 이동 방식과 시간 (6-5) | 물리 충격 / Root Motion Source / 직접 보간 / 즉시. 시간: 공격 데이터 / 설정 | **결정 (2026-11-16)**: Root Motion Source(캐릭터 무브먼트가 정해진 시간에 정해진 거리를 충돌 처리하며 이동, 히트스톱의 `CustomTimeDilation`을 자연히 따름). 이동 시간은 공격 데이터에 둔다 |
 | 타격 후 이동과 애니메이션 루트 모션의 결합 (6-5) | Root Motion Source Additive/Override / 루트 모션 가공 연결 지점 / 직접 이동 | **결정 (2026-11-16)**: 처음엔 때린 쪽 Additive, 맞은 쪽 Override로 정했으나, 엔진 소스 확인 결과 애니메이션 루트 모션이 재생 중이면 Root Motion Source는 모두 무시된다(`ApplyRootMotionToVelocity`). 그래서 양쪽 모두 캐릭터 무브먼트의 `ProcessRootMotionPostConvertToWorld`(Motion Warping은 Pre를 쓴다)에서 남은 이동량을 애니메이션 루트 모션에 더한다. 루트 모션 몽타주가 없을 때(지금의 더미)는 이 지점이 불리지 않으므로 Root Motion Source(Override, Z 무시, 끝나면 속도 0)로 같은 거리를 옮긴다 |
 | `UCombatCharacterData` 초기 칸 (6-3) | PLAN 4.6 네 항목 전부 / 쓰는 것만 / 조작감 값까지 이전 | **결정 (2026-11-16)**: `Mass`만 넣는다(3-1의 "쓰는 스텝에서 추가" 원칙). 임계값, 반응 단계, 반응 몽타주는 6-7, 6-8에서 추가. 조작감 값(`InputBufferDuration`, `HitStopTimeDilation`, `AttackTargetConeAngle`)은 몸의 성질이 아니므로 블루프린트 기본값에 그대로 둔다 |

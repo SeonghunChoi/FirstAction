@@ -85,6 +85,11 @@ struct FHitResolution
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
 	EHitReactionStage ReactionStage = EHitReactionStage::None;
 
+	// 부위 물리 반응: 맞은 바디(Hit.BoneName)에 줄 속도 변화 (cm/s). 0이면 반응 없음 (6-8)
+	// 크기는 상대 충격량의 임계값 초과분 × 계수, 방향은 칼이 지나간 방향. 어느 부위를 흔들지는 맞은 쪽 몸이 정한다
+	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
+	FVector PartialReactionVelocity = FVector::ZeroVector;
+
 	// 맞은 쪽이 Direction으로 밀리는 거리 (cm) — 맞은 쪽이 적용 (6-5)
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
 	float VictimDisplacement = 0.f;

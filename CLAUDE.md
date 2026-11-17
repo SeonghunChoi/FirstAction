@@ -161,11 +161,11 @@ Source/FirstAction/
 │   │   ├── CombatCharacterBase.h      // ASC 부착, 플레이어/적 공통
 │   │   ├── CombatAttributeSet.h       // Health, Poise
 │   │   ├── TrainingDummy.h            // 훈련 더미 (0이 되면 자동 리필). 템플릿 CombatDummy와 이름 충돌을 피함
-│   │   ├── CombatCharacterData.h      // 몸의 성질: 질량(6-3), 부위 반응 임계값(6-8), 반응 몽타주(6-7)
+│   │   ├── CombatCharacterData.h      // 몸의 성질: 질량(6-3), 반응 몽타주(6-7), 부위 대표 본과 회복 시간(6-8)
 │   │   ├── HitReactionTypes.h         // 반응 단계 열거형 (움찔/경직/넘어짐/그로기)
 │   │   ├── AttackDataAsset.h
 │   │   ├── HitResolveSubsystem.h      // FHitResolution, 간격 분배, 상대 충격량, 전달용 타깃 데이터
-│   │   ├── CombatSettings.h           // 프로젝트 설정 "Combat": 세계 규칙 계수 (밀림, 경직치, 반응 단계 경계)
+│   │   ├── CombatSettings.h           // 프로젝트 설정 "Combat": 세계 규칙 계수 (밀림, 경직치, 반응 단계 경계, 부위 반응)
 │   │   ├── PartialHitReactionComponent.h // 맞은 본 아래 물리 반응
 │   │   ├── MeleeTraceComponent.h
 │   │   ├── LockOnComponent.h
@@ -386,8 +386,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-7: `GA_HitReact`(`Event.HitReact`/`Event.Groggy` Ability Trigger, `ShouldAbilityRespondToEvent`로 공격 중 움찔·낮은 단계·누운 구간 거름, 같거나 높은 단계는 `bRetriggerInstancedAbility`로 처음부터, 경직 이상 `State.Staggered`, 그로기 `State.Groggy`, 그로기 끝에 `GE_RestorePoise`). `EHitReactionStage`, 매니저가 프로젝트 설정 경계값(250/700 cm/s)으로 `FHitResolution::ReactionStage`를 정함. `UCombatCharacterData`에 단계별 반응 몽타주와 `HeadRootBone`. `State.Downed` 태그, 공격은 `State.Staggered` 중 시작 불가, 더미 자동 리필은 체력만. 몽타주 `AM_UAL1_Hit_Chest`/`_Head`, `AM_UAL2_Hit_Knockback`(+`LayToIdle`, `State.Downed` 구간), `AM_UAL2_Idle_Shield_Break`(그로기), `BP_GA_HitReact`를 플레이어와 더미에 부여. 확인: 세 질량의 단계(Small 경직/넘어짐, 보통 경직/넘어짐, Large 움찔), 그로기 진입·차단·회복, 넘어짐 중 낮은 단계 유지. **미확인**: 누운 구간 반응 없음, 머리 몽타주(머리를 맞히지 못함), 공격 중 움찔 → Step 7에서 확인 (2026-11-17)
 
+- [x] Step 6-8: `UPartialHitReactionComponent`(FirstVR 방식: `UPhysicalAnimationComponent` 월드 기준 당김, 부위 대표 본 아래 물리 + `bVelChange` 충격, 회복 시간 동안 블렌드 1→0, 누운 구간·가드에서 막음). 매니저가 `FHitResolution::PartialReactionVelocity` = 칼 방향 × (상대 충격량 − 200) × 0.5 계산. 캐릭터 데이터에 부위 대표 본(양팔, 양다리, `neck_01`, `spine_01`), 골반용 대체 본, 회복 시간 0.4초. 캐릭터가 C++로 두 컴포넌트를 만들고 메시 충돌만 `QueryAndPhysics`(프로필 유지). 부위별 반응 확인(pelvis→spine_01, hand_r→upperarm_r, head→neck_01). 발견한 문제: 너무 가까이 붙으면 `Heavy_Combo` 1타 궤적이 대상 뒤로 지나가 맞지 않음 (2026-11-17)
+
 ### 현재 위치
-- **Step 6-8** 시작 전: `UPartialHitReactionComponent` (임계값 이상일 때 맞은 본 아래 물리 반응)
+- **Step 6-9** 시작 전: `GA_Dodge` (무적 구간, 공격 캔슬). 그 전에 `Heavy_Combo` 1타 근접 헛스윙 처리 여부 결정
 - Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지
 
 ### 결정 기록
@@ -418,6 +420,9 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 반응 중 다시 맞으면 같거나 높은 단계는 처음부터, 낮은 단계는 유지(6-7). 누운 구간(`State.Downed`)과 그로기 중에는 반응 없음. 단 누운 구간에 경직치가 0이 되면 그로기는 들어간다
 - 2026-11-17: 반응 단계 경계값은 세계 규칙(프로젝트 설정 `Combat`), 매니저가 단계를 정해 `FHitResolution`에 싣는다. 반응 몽타주는 `UCombatCharacterData`, 머리/몸통은 맞은 본으로 고른다(6-7)
 - 2026-11-17: 그로기는 몽타주 길이로 끝나고, 끝날 때 `GE_RestorePoise`로 경직치를 채운다. 그로기 중에는 피해만. 훈련 더미 자동 리필은 체력만 본다(6-7)
+- 2026-11-17: 부위 반응 임계값과 세기 계수는 세계 규칙(프로젝트 설정 `Combat`, 반응 단계 경계와 별개)(6-8). 세기는 (상대 충격량 − 임계값) × 계수의 속도 변화, 방향은 칼이 지나간 방향. 매니저가 `FHitResolution::PartialReactionVelocity`로 싣는다
+- 2026-11-17: 부위 반응은 맞은 본에서 위로 가장 가까운 부위 대표 본부터 흔든다(6-8). 대표 본 목록, 골반용 대체 본, 회복 시간은 몸마다 `UCombatCharacterData`에 둔다
+- 2026-11-17: 부위 반응은 누운 구간과 가드에서만 막고 나머지(공격 중 움찔, 그로기)는 늘 준다(6-8). 캐릭터가 `Event.HitReact`에서 부르고, 막는 태그는 컴포넌트가 본다
 - 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다
