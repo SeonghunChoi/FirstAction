@@ -136,6 +136,11 @@ void UGA_HitReact::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// 상태 태그: 경직 이상은 행동 불가(State.Staggered), 그로기는 State.Groggy도
 	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
 	{
+		// 움찔은 행동을 막지 않지만, 회피는 움찔 몽타주의 캔슬 구간에서만 끊게 한다(6-9). 그 판단용 표시
+		if (CurrentStage == EHitReactionStage::Flinch)
+		{
+			AddedStateTags.AddTag(CombatTags::State_Flinching);
+		}
 		if (CurrentStage >= EHitReactionStage::Stagger)
 		{
 			AddedStateTags.AddTag(CombatTags::State_Staggered);

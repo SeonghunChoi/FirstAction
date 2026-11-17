@@ -40,8 +40,11 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// 공격 중 입력은 입력 버퍼를 거쳐 이 어빌리티의 콤보 분기로 들어온다
 	ActivationBlockedTags.AddTag(CombatTags::State_Attacking);
 
-	// 경직(그로기, 넘어짐 포함) 중에는 공격을 시작하지 못한다 (6-7). 움찔은 태그가 없어 공격으로 끊고 나갈 수 있다
+	// 경직(그로기, 넘어짐 포함) 중에는 공격을 시작하지 못한다 (6-7). 움찔(State.Flinching)은 막지 않아 공격으로 끊고 나갈 수 있다
 	ActivationBlockedTags.AddTag(CombatTags::State_Staggered);
+
+	// 회피 중에는 회피 몽타주의 캔슬 구간(Window.Cancel)에서만 공격으로 이어 간다 (6-9 결정)
+	CancelWindowRequiredTags.AddTag(CombatTags::State_Dodging);
 }
 
 const UAttackDataAsset* UGA_MeleeAttack::ResolveStartAttack() const
@@ -326,6 +329,14 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	Input.MoveDuration = CurrentAttack->PostHitMoveDuration;
 
 	const FHitResolution Resolution = Resolver->Resolve(Input);
+
+	// 무적인 몸을 맞힘 (6-9): 그 휘두름의 맞힘은 소진되지만, 헛친 것처럼 피해·히트스톱·이동·반응·연출을 모두 건너뛴다
+	if (Resolution.Outcome == EHitOutcome::Evaded)
+	{
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] 회피됨: %s → %s (헛친 것으로 처리)"),
+			*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target));
+		return;
+	}
 
 	// 피해와 경직치는 매니저가 정한 값. GE_Damage는 속성에 이 값을 더하므로 음수로 넘긴다 (규칙 5)
 	SpecHandle.Data->SetSetByCallerMagnitude(CombatTags::SetByCaller_Damage, -Resolution.Damage);

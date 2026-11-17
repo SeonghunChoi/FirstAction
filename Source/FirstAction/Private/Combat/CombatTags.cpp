@@ -11,6 +11,7 @@ namespace CombatTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dodging, "State.Dodging", "회피 어빌리티 실행 중");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Guarding, "State.Guarding", "가드 중. 타격 해석에서 가드 규칙 적용");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Invulnerable, "State.Invulnerable", "무적. 판정은 되지만 피해와 반응이 없음");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Flinching, "State.Flinching", "움찔 반응 몽타주 재생 중. 행동은 막지 않고, 회피는 캔슬 구간에서만 끊는다");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Staggered, "State.Staggered", "경직 중. 행동 불가, AI와 공격 토큰이 공격을 멈추는 기준");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Groggy, "State.Groggy", "경직치 0으로 그로기");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Downed, "State.Downed", "넘어져 누운 구간. 넘어짐 몽타주의 ANS_TagWindow가 붙인다. 이 동안 피격 반응 없음");

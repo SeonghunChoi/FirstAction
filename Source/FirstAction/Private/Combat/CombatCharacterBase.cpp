@@ -133,13 +133,12 @@ void ACombatCharacterBase::AbilityInputTagPressed(FGameplayTag InputTag)
 		bFound = true;
 		if (Spec.IsActive())
 		{
-			// 이미 실행 중이면 입력이 들어왔다는 사실만 알린다 (콤보 입력은 Step 4에서 사용)
+			// 이미 실행 중이면 입력이 들어왔다는 사실을 알린다 (콤보 입력은 Step 4에서 사용)
 			AbilitySystemComponent->AbilitySpecInputPressed(Spec);
 		}
-		else
-		{
-			HandlesToActivate.Add(Spec.Handle);
-		}
+		// 실행 중이어도 다시 시작을 시도한다. 다시 시작을 허용하는 어빌리티(회피의 연속 구르기, 6-9)만 성공하고,
+		// 나머지(공격)는 막힘 태그로 실패해 지금처럼 입력 버퍼로 간다
+		HandlesToActivate.Add(Spec.Handle);
 	}
 
 	// 목록을 도는 중에 활성화하면 목록이 바뀔 수 있으므로, 핸들을 모은 뒤 따로 활성화한다
@@ -331,6 +330,50 @@ void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
 	OnInputBuffered.Broadcast(InputTag);
 }
 
+void ACombatCharacterBase::OnCancelWindowTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (NewCount > 0)
+	{
+		TryActivateBufferedInput();
+	}
+}
+
+void ACombatCharacterBase::TryActivateBufferedInput()
+{
+	if (!BufferedInput.InputTag.IsValid() || !GetWorld())
+	{
+		return;
+	}
+
+	const double Age = GetWorld()->GetTimeSeconds() - BufferedInput.PressedTime;
+	if (Age > InputBufferDuration)
+	{
+		BufferedInput = FCombatBufferedInput();
+		return;
+	}
+
+	TArray<FGameplayAbilitySpecHandle, TInlineAllocator<4>> Handles;
+	for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		if (Spec.Ability && Spec.GetDynamicSpecSourceTags().HasTagExact(BufferedInput.InputTag))
+		{
+			Handles.Add(Spec.Handle);
+		}
+	}
+
+	const FGameplayTag InputTag = BufferedInput.InputTag;
+	for (const FGameplayAbilitySpecHandle& Handle : Handles)
+	{
+		// 시작할 수 없는 입력(공격 중 강공격 등)은 막힘 태그로 실패하고 버퍼에 그대로 남는다
+		if (AbilitySystemComponent->TryActivateAbility(Handle))
+		{
+			BufferedInput = FCombatBufferedInput();
+			UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 버퍼 소비(캔슬 구간): %s (%.2f초 전 입력)"), *GetName(), *InputTag.ToString(), Age);
+			return;
+		}
+	}
+}
+
 bool ACombatCharacterBase::ConsumeBufferedInput(const FGameplayTagContainer& AcceptedInputTags, FGameplayTag& OutInputTag)
 {
 	if (!BufferedInput.InputTag.IsValid() || !GetWorld())
@@ -383,6 +426,10 @@ void ACombatCharacterBase::BeginPlay()
 	// 맞은 쪽 히트스톱 통로. 어빌리티 없이 이벤트 태그 하나만 듣는다 (정확히 이 태그일 때만 불린다)
 	AbilitySystemComponent->GenericGameplayEventCallbacks.FindOrAdd(CombatTags::Event_HitReact)
 		.AddUObject(this, &ACombatCharacterBase::HandleHitReactEvent);
+
+	// 캔슬 구간이 열리는 순간 선입력(회피 등)을 다시 시도한다 (6-9)
+	AbilitySystemComponent->RegisterGameplayTagEvent(CombatTags::Window_Cancel, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &ACombatCharacterBase::OnCancelWindowTagChanged);
 
 	// 소유자(Owner)와 몸(Avatar)이 모두 이 캐릭터. 컨트롤러가 없는 훈련 더미도 여기서 초기화된다
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);

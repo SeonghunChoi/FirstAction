@@ -36,7 +36,15 @@ public:
 
 	float GetPartialReactionRecoverTime() const { return PartialReactionRecoverTime; }
 
+	UAnimMontage* GetDodgeMontage() const { return DodgeMontage; }
+
 protected:
+	// 회피 몽타주 (6-9). 앞으로 구르는 루트 모션 하나를 회피 방향으로 몸을 돌려 쓴다
+	// 무적 구간(State.Invulnerable)과 캔슬 구간(Window.Cancel)은 이 몽타주의 ANS_TagWindow가 정한다
+	// 반응 몽타주처럼 몸마다 다르므로 캐릭터 데이터에 둔다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dodge")
+	TObjectPtr<UAnimMontage> DodgeMontage;
+
 	// 부위 대표 본. 이 본과 그 아래가 함께 흔들린다 (6-8 결정: 부위 단위, 스켈레톤마다 다르므로 몸의 데이터)
 	// 기본값은 마네킹: 양팔, 양다리, 머리, 상체
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Partial Reaction")

@@ -20,3 +20,14 @@ enum class EHitReactionStage : uint8
 	// 그로기: 경직치 0 (Event.Groggy). 몽타주가 끝나면 경직치를 채운다. 그 동안은 피해만
 	Groggy
 };
+
+// 타격의 결과 종류. 매니저가 맞는 쪽 상태 태그를 보고 정한다 (규칙 6-4, Step 6-9)
+// 가드·패리·저스트 회피(6-11~6-13)도 여기에 값을 더해 같은 자리에서 결과를 바꾼다
+UENUM(BlueprintType)
+enum class EHitOutcome : uint8
+{
+	// 일반 타격: 피해, 경직치, 밀림, 반응 모두 적용
+	Hit,
+	// 무적(State.Invulnerable) 중이라 아무 결과도 없음. 때린 쪽도 헛친 것처럼 히트스톱·이동·연출이 없다
+	Evaded
+};

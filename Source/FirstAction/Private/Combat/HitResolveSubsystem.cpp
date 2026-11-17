@@ -3,6 +3,9 @@
 #include "Combat/CombatCharacterBase.h"
 #include "Combat/CombatCharacterData.h"
 #include "Combat/CombatSettings.h"
+#include "Combat/CombatTags.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemGlobals.h"
 #include "FirstAction.h"
 
 namespace
@@ -65,6 +68,21 @@ FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) cons
 	const FVector Direction = ToVictim.GetSafeNormal();
 	Result.Direction = Direction.IsNearlyZero() ? Input.Attacker->GetActorForwardVector() : Direction;
 	Result.InitialGap = ToVictim.Size() - Input.Attacker->GetSimpleCollisionRadius() - Input.Victim->GetSimpleCollisionRadius();
+
+	// 방어 규칙 (규칙 6-4): 맞는 쪽 상태 태그로 결과 종류를 정한다
+	// 무적(회피의 무적 구간, 6-9): 맞힘은 기록되지만 피해·경직치·밀림·반응이 없고, 때린 쪽도 헛친 것처럼 아무것도 적용하지 않는다
+	const UAbilitySystemComponent* VictimASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Input.Victim);
+	if (VictimASC && VictimASC->HasMatchingGameplayTag(CombatTags::State_Invulnerable))
+	{
+		Result.Outcome = EHitOutcome::Evaded;
+		Result.Damage = 0.f;
+		Result.AttackerHitStop = 0.f;
+		Result.VictimHitStop = 0.f;
+		Result.MoveDuration = 0.f;
+		UE_LOG(LogFirstAction, Log, TEXT("[해석] %s → %s: 회피됨 (State.Invulnerable)"),
+			*GetNameSafe(Input.Attacker), *GetNameSafe(Input.Victim));
+		return Result;
+	}
 
 	// 상대 충격량: 여기서 한 번만 계산한다 (규칙 6-2)
 	const float VictimMass = GetMass(Input.Victim);

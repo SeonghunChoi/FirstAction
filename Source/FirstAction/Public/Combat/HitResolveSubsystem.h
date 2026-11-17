@@ -66,6 +66,10 @@ struct FHitResolution
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
 	FHitResult Hit;
 
+	// 타격 결과 종류 (6-9). Hit가 아니면 아래 값들은 그 규칙대로 바뀌어 있다 (Evaded: 모두 0)
+	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
+	EHitOutcome Outcome = EHitOutcome::Hit;
+
 	// 때린 쪽 → 맞은 쪽 수평 단위 방향. 맞은 쪽은 이 방향으로, 때린 쪽은 반대 방향으로 물러난다
 	UPROPERTY(BlueprintReadOnly, Category = "Hit Resolve")
 	FVector Direction = FVector::ForwardVector;

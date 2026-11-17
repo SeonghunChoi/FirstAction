@@ -6,7 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "Combat/Abilities/CombatGameplayAbility.h"
 #include "GameplayTagContainer.h"
 #include "GA_MeleeAttack.generated.h"
 
@@ -19,7 +19,7 @@ class URootMotionModifier;
 struct FGameplayEventData;
 
 UCLASS()
-class FIRSTACTION_API UGA_MeleeAttack : public UGameplayAbility
+class FIRSTACTION_API UGA_MeleeAttack : public UCombatGameplayAbility
 {
 	GENERATED_BODY()
 

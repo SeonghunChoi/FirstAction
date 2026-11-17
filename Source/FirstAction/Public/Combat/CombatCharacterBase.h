@@ -86,6 +86,10 @@ public:
 	// 플레이어는 락온 중이면 락온 대상(6-14), AI는 쫓는 대상(Step 7)을 돌려주도록 재정의한다. 이 둘은 거리 밖이어도 돌려준다
 	virtual AActor* FindAttackTarget(float MaxDistance) const;
 
+	// 회피 방향 (Step 6-9). 기본은 공격 대상 탐색과 같은 기준: 이동 입력(스틱)이 있으면 그 방향, 없으면 정면 (6-9 결정)
+	// AI(Step 7)는 필요하면 재정의한다
+	virtual FVector GetDodgeDirection() const { return GetAttackTargetDirection(); }
+
 	// 입력 태그로 어빌리티 실행을 요청한다. 플레이어 입력도 AI도 이 두 함수만 부른다(설계 규칙 1)
 	//   눌림: 짝인 어빌리티가 실행 중이 아니면 활성화를 시도하고, 실행 중이면 입력 눌림을 전달한다
 	//   뗌:   실행 중인 어빌리티에 입력 뗌을 전달한다 (가드처럼 누르고 있는 동안만 유지하는 어빌리티용)
@@ -179,6 +183,13 @@ private:
 
 	// 새 어빌리티를 시작하지 못한 입력을 기록한다. 가장 최근 입력 하나만 남긴다
 	void BufferInput(const FGameplayTag& InputTag);
+
+	// Window.Cancel이 붙는 순간: 버퍼에 남은 입력으로 어빌리티를 다시 시도한다 (6-9 결정: 회피 선입력)
+	// 공격 콤보는 공격 어빌리티가 Window.Combo에서 꺼내고, 그 밖의 행동(회피 등)은 여기서 살아난다
+	void OnCancelWindowTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	// 버퍼의 입력과 짝인 어빌리티를 시작해 본다. 하나라도 시작하면 버퍼를 비운다
+	void TryActivateBufferedInput();
 
 	// 실행 중 상태값: 디버깅용으로 보기만 (설계 규칙 9)
 	UPROPERTY(VisibleInstanceOnly, Category = "Combat|Input")
