@@ -138,6 +138,21 @@ FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) cons
 	// 방어 규칙 (규칙 6-4): 맞는 쪽 상태 태그로 결과 종류를 정한다
 	// 무적(회피의 무적 구간, 6-9): 맞힘은 기록되지만 피해·경직치·밀림·반응이 없고, 때린 쪽도 헛친 것처럼 아무것도 적용하지 않는다
 	const UAbilitySystemComponent* VictimASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Input.Victim);
+
+	// 저스트 회피(6-10, 6-13 결정): 무적 구간 앞부분(Window.JustDodge)이면 일반 회피보다 우선한다(좁은 창이 이긴다)
+	// 결과 값은 일반 회피와 같이 모두 0. 보상(슬로모션)은 회피한 쪽이 이 결과를 받아 적용한다
+	if (VictimASC && VictimASC->HasMatchingGameplayTag(CombatTags::Window_JustDodge))
+	{
+		Result.Outcome = EHitOutcome::JustDodged;
+		Result.Damage = 0.f;
+		Result.AttackerHitStop = 0.f;
+		Result.VictimHitStop = 0.f;
+		Result.MoveDuration = 0.f;
+		UE_LOG(LogFirstAction, Log, TEXT("[해석] %s → %s: 저스트 회피 (Window.JustDodge)"),
+			*GetNameSafe(Input.Attacker), *GetNameSafe(Input.Victim));
+		return Result;
+	}
+
 	if (VictimASC && VictimASC->HasMatchingGameplayTag(CombatTags::State_Invulnerable))
 	{
 		Result.Outcome = EHitOutcome::Evaded;

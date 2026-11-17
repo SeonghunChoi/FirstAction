@@ -122,6 +122,10 @@ public:
 	// 각자 자기에게만 건다: 때린 쪽은 공격 어빌리티가, 맞은 쪽은 Event.HitReact를 받은 자신이 부른다(6-1 결정)
 	void ApplyHitStop(float Duration);
 
+	// 잠시 느려짐: Duration초(실제 시간) 동안 시간 배율 Dilation (Step 6-13, 저스트 회피 보상)
+	// 히트스톱과 따로 관리하고, 둘이 겹치면 더 느린 배율을 적용한다. 이미 더 길고 더 느린 슬로모션이 걸려 있으면 무시한다
+	void ApplyTimeSlow(float Duration, float Dilation);
+
 	// 타격 후 이동: Direction(수평) 쪽으로 Distance(cm, 음수면 반대쪽)를 Duration초에 걸쳐 움직인다 (Step 6-5)
 	// 루트 모션 몽타주 재생 중: 애니메이션 루트 모션에 남은 이동량을 더한다 (애니메이션 전진은 살아 있음)
 	// 그 밖: Root Motion Source(Override)로 같은 거리를 옮긴다. 엔진은 애니메이션 루트 모션이 있으면 Root Motion Source를 무시한다
@@ -181,8 +185,20 @@ private:
 	void HandleHitReactEvent(const FGameplayEventData* Payload);
 
 	void EndHitStop();
+	void EndTimeSlow();
+
+	// 시간 배율 출처(히트스톱, 슬로모션) 중 가장 느린 것을 CustomTimeDilation에 적용한다
+	void UpdateTimeDilation();
+
+	// 저스트 회피 성공(6-13): 자신을 뺀 모든 전투 캐릭터를 잠시 느리게 한다. 각 캐릭터는 자기 ApplyTimeSlow로 스스로 느려진다
+	void StartJustDodgeSlow();
 
 	FTimerHandle HitStopTimer;
+	FTimerHandle TimeSlowTimer;
+
+	// 지금 걸려 있는 출처별 시간 배율 (1이면 없음)
+	float ActiveHitStopDilation = 1.f;
+	float ActiveTimeSlowDilation = 1.f;
 
 	// 캐릭터 무브먼트의 ProcessRootMotionPostConvertToWorld에 연결 (6-5). 월드 기준 애니메이션 루트 모션에 이번 프레임 몫을 더한다
 	// Motion Warping(6-2)은 Pre 쪽을 쓰므로 겹치지 않는다. 애니메이션 루트 모션이 있는 프레임에만 불린다

@@ -23,7 +23,9 @@ enum class ETrainingDummyDefense : uint8
 	// 가드를 계속 올리고 있음. 가드가 깨지면(그로기) 다시 올린다 → 막는 판정(6-11) 시험
 	HoldGuard,
 	// 일정 간격으로 가드를 올렸다 바로 내림. 올리는 순간(Window.Parry)에 맞으면 플레이어 공격이 패리된다 → 패리(6-12) 시험
-	RepeatGuard
+	RepeatGuard,
+	// 일정 간격으로 정면으로 구름. 구르기 앞부분(Window.JustDodge)에 맞으면 저스트 회피, 무적 뒷부분이면 일반 회피 → 6-9, 6-13 시험
+	RepeatDodge
 };
 
 UCLASS()

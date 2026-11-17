@@ -403,9 +403,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-12: 매니저 `EHitOutcome::Parried`(`Window.Parry` + 정면 각도, 가드보다 우선, 방어자 결과 0, 히트스톱 × `ParryHitStopMultiplier` 2.0)와 `ResolveParryRecoil`(되돌린 상대 충격량 = 충격 ÷ 공격자 질량, 최소 경직, 경직치, `AttackBone` 부위 반응). `GA_MeleeAttack`이 방어자와 자신에게 각각 `Event.HitReact`, `Hit.Parried` 양쪽, 자기 경직치는 `GE_Damage`로. `GA_Guard`가 `Parried`면 `Parry` 구간으로. 공격 데이터 `AttackBone`(기본 `hand_r`). 가드 몽타주에 `Sword_Regular_B_Rec`를 이어 붙인 `Parry` 구간(반격 `Window.Cancel`), `GCN_Hit_Parried`. 훈련 더미 시험용 `DefenseMode`(`HoldGuard`, `RepeatGuard`). 확인: 패리 3회(공격자 경직·`upperarm_r` 부위 반응·히트스톱 0.12초, 방어자 `Parry` 구간), 가드 11회(체력 0), 가드 중 경직치 0 → 그로기로 가드 깨짐 → 회복 후 다시 가드 (2026-11-17)
 
+- [x] Step 6-13: 매니저 `EHitOutcome::JustDodged`(`Window.JustDodge`, 일반 회피보다 우선, 결과 0, 공격자 헛침). 회피한 쪽이 결과를 받아 자신을 뺀 모든 전투 캐릭터의 `ApplyTimeSlow`(배율 0.25, 1.5초, 세계 규칙). 캐릭터 시간 배율을 히트스톱·슬로모션 출처별로 관리(더 느린 쪽). `GameplayCue.Hit.JustDodged`(회피한 쪽만), `AM_UAL1_Roll`에 `Window.JustDodge`, 더미 `RepeatDodge`. 확인: 저스트 회피 2회(다른 캐릭터 5명 모두 슬로모션), 일반 회피(`Evaded`) 8회(6-9 미확인분). 미확인: 슬로모션 중 히트스톱이 겹쳤을 때 (2026-11-17)
+
 ### 현재 위치
-- **Step 6-13** 시작 전: 저스트 회피 규칙 (공격자는 공격 데이터대로 이동, 방어자는 회피 방향, 피해 없음)
-- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 6-9 무적(`Evaded`, 헛친 느낌), 경직 중 회피 금지, 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 적이 플레이어의 가드·패리에 막히는 경우
+- **Step 6-14** 시작 전: `ULockOnComponent`
+- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 적이 플레이어의 가드·패리에 막히는 경우
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -455,6 +457,9 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 패리 순간 히트스톱은 `ParryHitStopMultiplier`(프로젝트 설정)배로 길게, 전용 `GameplayCue.Hit.Parried`를 양쪽에, 이동 없음(6-12)
 - 2026-11-17: 패리 성공 시 방어자 가드 몽타주가 `Parry` 구간으로 넘어가고, 그 구간의 `Window.Cancel`부터 반격(6-12). `Parry` 구간은 다른 애니메이션(깃 버전 `Sword_Regular_B_Rec`)을 가드 몽타주에 이어 붙여 성공 동작을 구분하고, `Window.Cancel`로 구간 전체를 덮는다
 - 2026-11-17: 적 AI 전 방어 시험용으로 훈련 더미에 배치별 `DefenseMode`(`HoldGuard`, `RepeatGuard`)(6-12)
+- 2026-11-17: 저스트 회피 보상은 슬로모션(6-13). 패리는 빠른 반격, 저스트 회피는 시간 벌기로 갈라 둔다
+- 2026-11-17: 슬로모션은 회피한 쪽을 뺀 모든 전투 캐릭터, 배율·시간은 세계 규칙(`JustDodgeTimeDilation`, `JustDodgeSlowDuration`). 각 캐릭터가 `ApplyTimeSlow`로 스스로 느려지고, 히트스톱과 겹치면 더 느린 쪽. 공격자는 헛친다(6-13)
+- 2026-11-17: 저스트 회피 연출은 회피한 쪽에만 `GameplayCue.Hit.JustDodged`, 끝 표시 없음(6-13). 시험용 더미 `RepeatDodge`
 - 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다

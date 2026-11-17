@@ -33,4 +33,5 @@ namespace CombatTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Hit_Taken, "GameplayCue.Hit.Taken", "내가 맞음 (맞은 쪽 연출: 불꽃, 타격음, 카메라 흔들림)");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Hit_Guarded, "GameplayCue.Hit.Guarded", "가드로 막음: 막은 쪽 연출(금속 불꽃, 막는 소리). 공격 어빌리티가 결과에 따라 맞은 쪽에 발생 (6-11)");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Hit_Parried, "GameplayCue.Hit.Parried", "패리: 공격을 튕겨 냄. 공격 어빌리티가 양쪽에 발생 (6-12)");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Hit_JustDodged, "GameplayCue.Hit.JustDodged", "저스트 회피: 회피한 쪽에만 발생. 슬로모션 시작 연출 (6-13)");
 }

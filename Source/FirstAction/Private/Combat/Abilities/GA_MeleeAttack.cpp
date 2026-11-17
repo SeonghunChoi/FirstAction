@@ -333,6 +333,27 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	const FHitResolution Resolution = Resolver->Resolve(Input);
 
 	// 무적인 몸을 맞힘 (6-9): 그 휘두름의 맞힘은 소진되지만, 헛친 것처럼 피해·히트스톱·이동·반응·연출을 모두 건너뛴다
+	// 저스트 회피당함 (6-13): 때린 쪽은 일반 회피처럼 헛친다. 회피한 쪽에는 결과(슬로모션 보상)와 전용 Cue를 보낸다
+	if (Resolution.Outcome == EHitOutcome::JustDodged)
+	{
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] 저스트 회피당함: %s → %s (헛친 것으로 처리)"),
+			*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target));
+
+		FGameplayEventData DodgerPayload;
+		DodgerPayload.EventTag = CombatTags::Event_HitReact;
+		DodgerPayload.Instigator = GetAvatarActorFromActorInfo();
+		DodgerPayload.Target = Target;
+		DodgerPayload.TargetData.Add(new FGameplayAbilityTargetData_HitResolution(Resolution));
+		if (Hit)
+		{
+			SpecHandle.Data->GetContext().AddHitResult(*Hit, true);
+		}
+		DodgerPayload.ContextHandle = SpecHandle.Data->GetContext();
+		TargetASC->HandleGameplayEvent(DodgerPayload.EventTag, &DodgerPayload);
+		TargetASC->ExecuteGameplayCue(CombatTags::GameplayCue_Hit_JustDodged, SpecHandle.Data->GetContext());
+		return;
+	}
+
 	if (Resolution.Outcome == EHitOutcome::Evaded)
 	{
 		UE_LOG(LogFirstAction, Log, TEXT("[%s] 회피됨: %s → %s (헛친 것으로 처리)"),

@@ -19,6 +19,7 @@
 #include "Combat/PartialHitReactionComponent.h"
 #include "Combat/CombatCharacterData.h"
 #include "Combat/HitResolveSubsystem.h"
+#include "Combat/CombatSettings.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
 
@@ -204,6 +205,13 @@ void ACombatCharacterBase::HandleHitReactEvent(const FGameplayEventData* Payload
 	const FHitResolution* Resolution = Payload ? UHitResolveSubsystem::FindHitResolution(Payload->TargetData) : nullptr;
 	if (Resolution)
 	{
+		// 저스트 회피 성공 (6-13): 보상으로 자신을 뺀 모든 전투 캐릭터가 느려진다. 피해·이동·반응은 없다
+		if (Resolution->Outcome == EHitOutcome::JustDodged)
+		{
+			StartJustDodgeSlow();
+			return;
+		}
+
 		ApplyHitStop(Resolution->VictimHitStop);
 		ApplyHitDisplacement(Resolution->Direction, Resolution->VictimDisplacement, Resolution->MoveDuration);
 		if (PartialHitReaction && !Resolution->PartialReactionVelocity.IsNearlyZero())
@@ -227,7 +235,8 @@ void ACombatCharacterBase::ApplyHitStop(float Duration)
 		return;
 	}
 
-	CustomTimeDilation = HitStopTimeDilation;
+	ActiveHitStopDilation = HitStopTimeDilation;
+	UpdateTimeDilation();
 	TimerManager.SetTimer(HitStopTimer, this, &ACombatCharacterBase::EndHitStop, Duration, false);
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 히트스톱 %.3f초 (배율 %.2f)"), *GetName(), Duration, HitStopTimeDilation);
@@ -235,7 +244,54 @@ void ACombatCharacterBase::ApplyHitStop(float Duration)
 
 void ACombatCharacterBase::EndHitStop()
 {
-	CustomTimeDilation = 1.f;
+	ActiveHitStopDilation = 1.f;
+	UpdateTimeDilation();
+}
+
+void ACombatCharacterBase::ApplyTimeSlow(float Duration, float Dilation)
+{
+	if (Duration <= 0.f || Dilation >= 1.f || !GetWorld())
+	{
+		return;
+	}
+
+	FTimerManager& TimerManager = GetWorldTimerManager();
+	if (TimerManager.IsTimerActive(TimeSlowTimer) && TimerManager.GetTimerRemaining(TimeSlowTimer) >= Duration && ActiveTimeSlowDilation <= Dilation)
+	{
+		return;
+	}
+
+	ActiveTimeSlowDilation = Dilation;
+	UpdateTimeDilation();
+	TimerManager.SetTimer(TimeSlowTimer, this, &ACombatCharacterBase::EndTimeSlow, Duration, false);
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 슬로모션 %.2f초 (배율 %.2f)"), *GetName(), Duration, Dilation);
+}
+
+void ACombatCharacterBase::EndTimeSlow()
+{
+	ActiveTimeSlowDilation = 1.f;
+	UpdateTimeDilation();
+}
+
+void ACombatCharacterBase::UpdateTimeDilation()
+{
+	CustomTimeDilation = FMath::Min(ActiveHitStopDilation, ActiveTimeSlowDilation);
+}
+
+void ACombatCharacterBase::StartJustDodgeSlow()
+{
+	const UCombatSettings* Settings = GetDefault<UCombatSettings>();
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 저스트 회피 성공: 다른 전투 캐릭터 %.2f초 동안 배율 %.2f"),
+		*GetName(), Settings->JustDodgeSlowDuration, Settings->JustDodgeTimeDilation);
+
+	for (TActorIterator<ACombatCharacterBase> It(GetWorld()); It; ++It)
+	{
+		if (*It != this && !It->IsActorBeingDestroyed())
+		{
+			It->ApplyTimeSlow(Settings->JustDodgeSlowDuration, Settings->JustDodgeTimeDilation);
+		}
+	}
 }
 
 namespace

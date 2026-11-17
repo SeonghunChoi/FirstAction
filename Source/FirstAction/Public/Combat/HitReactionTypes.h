@@ -34,5 +34,8 @@ enum class EHitOutcome : uint8
 	Guarded,
 	// 패리(Window.Parry, 정면 각도 안): 방어자는 피해·경직치·밀림·반응 없음, 히트스톱은 길게.
 	// 충격이 공격자에게 되돌아가 공격자가 AttackBone 부위 반응과 최소 경직으로 튕긴다 (6-12, 규칙 6-5)
-	Parried
+	Parried,
+	// 저스트 회피(Window.JustDodge, 회피 무적 구간 앞부분): 일반 회피처럼 아무 결과도 없고 때린 쪽은 헛친다.
+	// 보상으로 회피한 쪽을 뺀 모든 전투 캐릭터가 잠시 느려진다 (6-13)
+	JustDodged
 };

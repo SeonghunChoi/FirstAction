@@ -48,4 +48,12 @@ public:
 	// 패리 순간의 히트스톱 배율. 공격 데이터의 HitStopDuration에 곱해 양쪽에 건다 (6-12 결정: 패리는 더 길게)
 	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Defense", meta = (ClampMin = "1.0"))
 	float ParryHitStopMultiplier = 1.f;
+
+	// 저스트 회피 보상: 회피한 쪽을 뺀 모든 전투 캐릭터의 시간 배율과 지속 시간 (6-13 결정: 슬로모션, 세계 규칙)
+	// 지속 시간은 실제 시간(초). 히트스톱과 겹치면 캐릭터가 더 느린 쪽을 적용한다
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Defense", meta = (ClampMin = "0.01", ClampMax = "1.0"))
+	float JustDodgeTimeDilation = 1.f;
+
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Defense", meta = (ClampMin = "0.0", Units = "s"))
+	float JustDodgeSlowDuration = 0.f;
 };

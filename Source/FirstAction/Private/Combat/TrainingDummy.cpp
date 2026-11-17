@@ -60,6 +60,11 @@ void ATrainingDummy::TickDefense()
 		AbilityInputTagReleased(CombatTags::InputTag_Guard);
 		break;
 
+	case ETrainingDummyDefense::RepeatDodge:
+		AbilityInputTagPressed(CombatTags::InputTag_Dodge);
+		AbilityInputTagReleased(CombatTags::InputTag_Dodge);
+		break;
+
 	default:
 		break;
 	}
