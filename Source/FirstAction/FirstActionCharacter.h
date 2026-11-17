@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UCombatInputConfig;
+class ULockOnComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -33,6 +34,10 @@ class AFirstActionCharacter : public ACombatCharacterBase
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
+
+	// FirstAction: 락온 (Step 6-14). 플레이어 전용 (2026-11-15 결정)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<ULockOnComponent> LockOn;
 	
 protected:
 
@@ -56,6 +61,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Combat")
 	TObjectPtr<UCombatInputConfig> CombatInputConfig;
 
+	// FirstAction: 락온 토글 입력 (R3, Step 6-14). 어빌리티가 아니라 플레이어 컴포넌트 기능이라 입력 태그를 거치지 않는다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Input|Combat")
+	TObjectPtr<UInputAction> LockOnAction;
+
 public:
 
 	/** Constructor */
@@ -74,7 +83,15 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
+	// FirstAction: 오른쪽 스틱. 락온 중이면 대상 바꾸기, 아니면 카메라 (Step 6-14)
+	void StickLook(const FInputActionValue& Value);
+	void StickLookReleased(const FInputActionValue& Value);
+
 public:
+
+	// FirstAction: 락온 중이면 락온 대상을 거리와 상관없이 돌려준다 (6-2 결정). 아니면 기본 탐색
+	virtual AActor* FindAttackTarget(float MaxDistance) const override;
+
 
 	/** Handles move inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")

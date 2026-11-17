@@ -12,6 +12,7 @@
 #include "InputActionValue.h"
 #include "FirstAction.h"
 #include "Input/CombatInputConfig.h"
+#include "Combat/LockOnComponent.h"
 
 AFirstActionCharacter::AFirstActionCharacter()
 {
@@ -47,6 +48,8 @@ AFirstActionCharacter::AFirstActionCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
+	LockOn = CreateDefaultSubobject<ULockOnComponent>(TEXT("LockOn"));
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -65,7 +68,15 @@ void AFirstActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AFirstActionCharacter::Look);
 
 		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFirstActionCharacter::Look);
+		// FirstAction: 오른쪽 스틱은 락온 중 대상 바꾸기로도 쓰므로 마우스와 따로 받는다 (Step 6-14)
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFirstActionCharacter::StickLook);
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Completed, this, &AFirstActionCharacter::StickLookReleased);
+
+		// FirstAction: 락온 토글 (R3, Step 6-14)
+		if (LockOnAction && LockOn)
+		{
+			EnhancedInputComponent->BindAction(LockOnAction, ETriggerEvent::Started, LockOn.Get(), &ULockOnComponent::ToggleLockOn);
+		}
 
 		// FirstAction: 전투 입력. 입력 액션마다 자기 입력 태그를 함께 넘기도록 바인딩한다 (Step 2-2)
 		if (CombatInputConfig)
@@ -100,8 +111,41 @@ void AFirstActionCharacter::Move(const FInputActionValue& Value)
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
+void AFirstActionCharacter::StickLook(const FInputActionValue& Value)
+{
+	if (LockOn && LockOn->IsLockedOn())
+	{
+		LockOn->HandleSwitchInput(Value.Get<FVector2D>());
+		return;
+	}
+	Look(Value);
+}
+
+void AFirstActionCharacter::StickLookReleased(const FInputActionValue& Value)
+{
+	if (LockOn)
+	{
+		LockOn->ResetSwitchInput();
+	}
+}
+
+AActor* AFirstActionCharacter::FindAttackTarget(float MaxDistance) const
+{
+	if (LockOn && LockOn->IsLockedOn())
+	{
+		return LockOn->GetLockTarget();
+	}
+	return Super::FindAttackTarget(MaxDistance);
+}
+
 void AFirstActionCharacter::Look(const FInputActionValue& Value)
 {
+	// FirstAction: 락온 중에는 카메라를 락온이 돌린다. 마우스 시점 입력은 무시한다 (Step 6-14)
+	if (LockOn && LockOn->IsLockedOn())
+	{
+		return;
+	}
+
 	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 
