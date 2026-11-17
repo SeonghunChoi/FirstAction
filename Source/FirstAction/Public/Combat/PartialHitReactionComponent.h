@@ -34,6 +34,9 @@ public:
 	// 타격(6-8) 외에 패리(6-12, 공격자의 AttackBone)도 이 함수를 쓴다
 	void ApplyPartialHit(FName HitBone, const FVector& Velocity);
 
+	// 사망(7-1): 진행 중인 부위 반응을 멈추고 당기는 힘을 끈 채 전신을 물리로 (FirstVR StartRagdoll). 한 번만 동작한다
+	void StartRagdoll();
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -57,4 +60,6 @@ private:
 
 	// 흔들리는 중인 부위. 키는 부위 대표 본, 값은 지난 시간
 	TMap<FName, float> ActiveReactions;
+
+	bool bRagdoll = false;
 };

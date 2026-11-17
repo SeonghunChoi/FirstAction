@@ -58,7 +58,7 @@ void UPartialHitReactionComponent::BeginPlay()
 
 void UPartialHitReactionComponent::ApplyPartialHit(FName HitBone, const FVector& Velocity)
 {
-	if (!Mesh || !PhysicalAnimation || HitBone.IsNone() || Velocity.IsNearlyZero())
+	if (!Mesh || !PhysicalAnimation || HitBone.IsNone() || Velocity.IsNearlyZero() || bRagdoll)
 	{
 		return;
 	}
@@ -122,6 +122,25 @@ void UPartialHitReactionComponent::ApplyPartialHit(FName HitBone, const FVector&
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 부위 반응: 맞은 본 %s → 부위 %s, 충격 %s, 속도 변화 %.0f"),
 		*GetNameSafe(GetOwner()), *HitBone.ToString(), *RootBone.ToString(), *ImpulseBone.ToString(), Velocity.Size());
+}
+
+void UPartialHitReactionComponent::StartRagdoll()
+{
+	if (!Mesh || !PhysicalAnimation || bRagdoll)
+	{
+		return;
+	}
+	bRagdoll = true;
+
+	ActiveReactions.Empty();
+	SetComponentTickEnabled(false);
+
+	PhysicalAnimation->SetStrengthMultiplyer(0.f);
+	Mesh->SetAllBodiesSimulatePhysics(true);
+	Mesh->SetAllBodiesPhysicsBlendWeight(1.f);
+	Mesh->WakeAllRigidBodies();
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 래그돌"), *GetNameSafe(GetOwner()));
 }
 
 void UPartialHitReactionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

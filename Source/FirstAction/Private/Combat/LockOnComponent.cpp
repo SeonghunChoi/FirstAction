@@ -40,6 +40,12 @@ bool ULockOnComponent::IsValidTarget(const AActor* Candidate, float MaxDistance)
 	{
 		return false;
 	}
+	// 적만 잡는다 (7-1)
+	const ACombatCharacterBase* Self = Cast<ACombatCharacterBase>(GetOwner());
+	if (Self && !Self->IsHostileTo(Candidate))
+	{
+		return false;
+	}
 	const UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Candidate);
 	if (ASC && ASC->HasMatchingGameplayTag(CombatTags::State_Dead))
 	{

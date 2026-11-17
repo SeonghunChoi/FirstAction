@@ -46,10 +46,24 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// 회피·가드 중에는 그 몽타주의 캔슬 구간(Window.Cancel)에서만 공격으로 이어 간다 (6-9, 6-11 결정)
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Dodging);
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Guarding);
+
+	// AI의 공격 요청 (7-1): Event.AttackRequest 게임플레이 이벤트로도 시작한다. 요청자는 이 어빌리티를 모른다(규칙 1)
+	FAbilityTriggerData RequestTrigger;
+	RequestTrigger.TriggerTag = CombatTags::Event_AttackRequest;
+	RequestTrigger.TriggerSource = EGameplayAbilityTriggerSource::GameplayEvent;
+	AbilityTriggers.Add(RequestTrigger);
 }
 
-const UAttackDataAsset* UGA_MeleeAttack::ResolveStartAttack() const
+const UAttackDataAsset* UGA_MeleeAttack::ResolveStartAttack(const FGameplayEventData* TriggerEventData) const
 {
+	// 페이로드 우선 (2026-11-16 결정): AI는 공격 요청 이벤트에 공격 데이터를 실어 보낸다
+	if (TriggerEventData)
+	{
+		if (const UAttackDataAsset* Requested = Cast<UAttackDataAsset>(TriggerEventData->OptionalObject))
+		{
+			return Requested;
+		}
+	}
 	return Cast<UAttackDataAsset>(GetCurrentSourceObject());
 }
 
@@ -63,7 +77,7 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
-	CurrentAttack = ResolveStartAttack();
+	CurrentAttack = ResolveStartAttack(TriggerEventData);
 	if (!CurrentAttack || !CurrentAttack->Montage)
 	{
 		UE_LOG(LogFirstAction, Warning, TEXT("[%s] GA_MeleeAttack: 시작 공격 데이터 또는 몽타주가 없습니다. 부여 목록의 Ability Data를 확인하세요."),

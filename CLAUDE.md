@@ -177,6 +177,7 @@ Source/FirstAction/
 │   │   │   ├── GA_MeleeAttack.h
 │   │   │   ├── GA_Dodge.h
 │   │   │   ├── GA_Guard.h
+│   │   │   ├── GA_Death.h             // 사망: State.Dead, 몽타주 후 래그돌 (7-1)
 │   │   │   └── GA_HitReact.h
 │   │   └── Animation/
 │   │       ├── ANS_TagWindow.h
@@ -185,6 +186,7 @@ Source/FirstAction/
 │   ├── Input/
 │   │   └── CombatInputConfig.h        // 입력 액션 → 입력 태그
 │   ├── AI/
+│   │   ├── EnemyCharacter.h           // 적: 같은 기반 클래스, 사망 후 제거, 공격 요청 (7-1)
 │   │   ├── EnemyPatternDataAsset.h
 │   │   ├── CombatTokenSubsystem.h
 │   │   └── StateTree/                 // StateTree 태스크, 조건
@@ -410,9 +412,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 6-15: Small/보통/Large에 약-약-약, 약-약-강 점검. 간격 유지·마무리 벌어짐·히트스톱·반응 모두 적당 → 값 변경 없이 기준값 확정, `Docs/Tuning.md`에 반응·방어 값 표와 점검 기록. Heavy 휘두름별 차이는 불필요해 하지 않음(Step 8이나 배포 빌드에서 재검토), 판정 구간 변경이 없어 저 프레임 재측정 생략 (2026-11-17)
 - [x] ✅ Step 6 마일스톤: 작은 적·큰 적 모두 콤보 중간 간격 유지, 마무리 타격에서 크게 벌어짐. 같은 공격이 일반 타격/가드/패리/일반 회피/저스트 회피에서 서로 다른 결과. 튜닝 전후 비교는 `Docs/Tuning.md` (2026-11-17)
 
+- [x] Step 7-1: `AEnemyCharacter`(같은 `ACombatCharacterBase`, AI 컨트롤러 자동 빙의, `RequestAttack` → `Event.AttackRequest` 페이로드로 `GA_MeleeAttack` 시작, 시험용 배치별 `TestAttack`/`TestAttackInterval`, 사망 후 `DeathRemovalTime` 뒤 제거, `OnEnemyDied`). 편은 `IGenericTeamAgentInterface`(캐릭터 BP `TeamId`, AI 컨트롤러에 빙의 시 전달, 같은 편 판정 제외). `GA_Death`(`Event.Death` 트리거, `State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌), 속성 세트가 체력 0 전환 순간 `Event.Death`. 캐릭터 데이터 `DeathMontage`, `A_UAL1_Death01`/`AM_UAL1_Death01`, `DA_Character_Enemy`, `Portfolio/Characters/BP_Enemy`. 확인: 적 공격이 플레이어에게 일반 타격(Stagger)·가드·그로기로 가드 깨짐·패리(적 반동 경직)·저스트 회피(슬로모션)로 갈림, 같은 편 더미는 대상이 아님, 적 사망 → 래그돌(2.2초) → 제거(5초). 미확인: 플레이어 사망, 사망 시 락온 다음 대상 (2026-11-17)
+
 ### 현재 위치
-- **Step 7-1** 시작 전: 적 캐릭터 (같은 기반 클래스, 같은 어빌리티)
-- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 적이 플레이어의 가드·패리에 막히는 경우
+- **Step 7-2** 시작 전: 설계 판단 StateTree / Behavior Tree
+- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 7-1 플레이어 사망, 사망 시 락온 다음 대상(6-14)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -468,6 +472,9 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 락온은 R3 토글, 카메라 정면 각도가 가장 작은 적(15m 안), 락온 중 오른쪽 스틱 튕김으로 대상 바꾸기(6-14). 플레이어 컴포넌트라 입력 태그 없이 `IA_LockOn`을 캐릭터가 직접 받는다
 - 2026-11-17: 락온 중 카메라는 좌우만 대상 쪽으로(속도 BP 기본값), 이동은 평소처럼, 공격은 `FindAttackTarget` 재정의로 락온 대상(6-14)
 - 2026-11-17: 락온은 재입력·사망·범위 이탈(18m)로 풀리고, 대상이 죽으면 다음 대상으로(6-14). 표시는 디버그 구(`FirstAction.ShowLockOn`)
+- 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
+- 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지
+- 2026-11-17: 적은 `Event.AttackRequest`(페이로드 = 공격 데이터)로 공격을 요청한다(7-1). AI 전 시험용 배치별 `TestAttack`
 - 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다

@@ -62,9 +62,8 @@ private:
 	void HandleParried(const FHitResolveInput& Input, const FHitResolution& Resolution, const UHitResolveSubsystem* Resolver,
 		const FGameplayEffectSpecHandle& SpecHandle, UAbilitySystemComponent* SourceASC, UAbilitySystemComponent* TargetASC);
 
-	// 시작 공격 데이터를 정한다. 지금은 부여 건의 데이터(SourceObject)만 본다.
-	// AI용 이벤트 페이로드 경로는 Step 7에서 여기에 추가한다
-	const UAttackDataAsset* ResolveStartAttack() const;
+	// 시작 공격 데이터를 정한다: 공격 요청 이벤트의 페이로드(AI, 7-1)가 있으면 그것, 없으면 부여 건의 데이터(플레이어)
+	const UAttackDataAsset* ResolveStartAttack(const FGameplayEventData* TriggerEventData) const;
 
 	ACombatCharacterBase* GetCombatCharacter() const;
 

@@ -6,6 +6,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "GenericTeamAgentInterface.h"
 #include "GameFramework/Character.h"
 #include "GameplayTagContainer.h"
 #include "CombatCharacterBase.generated.h"
@@ -60,8 +61,13 @@ struct FCombatBufferedInput
 	double PressedTime = 0.0;
 };
 
+class ACombatCharacterBase;
+
+// 사망 알림 (7-1). 적은 이것을 받아 일정 시간 뒤 제거되고, 스포너 등이 전멸을 센다
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnCombatCharacterDied, ACombatCharacterBase* /*DeadCharacter*/);
+
 UCLASS(Abstract)
-class FIRSTACTION_API ACombatCharacterBase : public ACharacter, public IAbilitySystemInterface
+class FIRSTACTION_API ACombatCharacterBase : public ACharacter, public IAbilitySystemInterface, public IGenericTeamAgentInterface
 {
 	GENERATED_BODY()
 
@@ -88,6 +94,20 @@ public:
 
 	// 가드·패리가 성립하는 정면 각도(전체, 도). 0이면 가드가 막지 못한다 (6-10 결정: 캐릭터마다)
 	float GetGuardAngle() const { return GuardAngle; }
+
+	// IGenericTeamAgentInterface: 엔진의 팀 판정 통로 (7-1 결정). AI 인지와 전투 코드가 같은 값을 쓴다
+	virtual FGenericTeamId GetGenericTeamId() const override { return FGenericTeamId(TeamId); }
+
+	// 적인가: 엔진 기본 규칙(팀 번호가 다르면 적, NoTeam이면 중립)으로 판단. 판정·공격 대상·락온이 이것으로 적만 고른다
+	bool IsHostileTo(const AActor* Other) const;
+
+	// 사망 처리 (7-1). GA_Death가 부른다
+	//   HandleDeathStarted: 이동·충돌을 끄고 OnDied를 알린다(파생 클래스는 제거 타이머 등을 더한다)
+	//   StartRagdoll: 사망 몽타주가 끝나면 전신 물리로
+	virtual void HandleDeathStarted();
+	void StartRagdoll();
+
+	FOnCombatCharacterDied OnDied;
 
 	// 입력 태그의 버튼이 지금 눌려 있는가 (가드처럼 누르고 있는 동안 유지하는 어빌리티용, 6-11)
 	bool IsInputTagHeld(const FGameplayTag& InputTag) const { return HeldInputTags.Contains(InputTag); }
@@ -166,6 +186,11 @@ protected:
 	// 튜닝값이므로 블루프린트 기본값에서 정한다. 공격과 상관없이 캐릭터마다 하나(6-2 결정)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting", meta = (ClampMin = "0.0", ClampMax = "360.0", Units = "Degrees"))
 	float AttackTargetConeAngle = 0.f;
+
+	// 편 (7-1 결정). 엔진 팀 번호: 플레이어 0, 적 1 (훈련 더미도 적 편). 255(NoTeam)이면 중립이라 아무도 공격하지 않는다
+	// "누구 편인가"는 몸의 성질이 아니라 캐릭터 종류의 성질이라 블루프린트 기본값에서 정한다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Team")
+	uint8 TeamId = FGenericTeamId::NoTeam.GetId();
 
 	// 가드·패리가 성립하는 정면 각도(전체, 도). 좌우로 절반씩 (6-10 결정). 튜닝값이므로 블루프린트 기본값에서 정한다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0", ClampMax = "360.0", Units = "Degrees"))

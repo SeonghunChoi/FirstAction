@@ -4,6 +4,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/GameplayAbilityTargetTypes.h"
 #include "Combat/CombatTags.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/DataAsset.h"
 #include "Engine/CollisionProfile.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -78,7 +79,11 @@ AActor* ACombatCharacterBase::FindAttackTarget(float MaxDistance) const
 		{
 			continue;
 		}
-		// 같은 편 제외는 적끼리 공존하는 Step 7에서 추가한다
+		// 적만 고른다 (7-1)
+		if (!IsHostileTo(Candidate))
+		{
+			continue;
+		}
 
 		// 거리는 몸끼리의 간격(중심 거리 − 양쪽 캡슐 반지름)으로 잰다. 워핑 목표 계산과 같은 기준
 		const FVector ToCandidate = Candidate->GetActorLocation() - Origin;
@@ -185,8 +190,49 @@ void ACombatCharacterBase::AbilityInputTagReleased(FGameplayTag InputTag)
 	}
 }
 
+bool ACombatCharacterBase::IsHostileTo(const AActor* Other) const
+{
+	return FGenericTeamId::GetAttitude(this, Other) == ETeamAttitude::Hostile;
+}
+
+void ACombatCharacterBase::HandleDeathStarted()
+{
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 사망"), *GetName());
+
+	// 더 움직이지 않고 길을 막지 않는다. 판정 중이던 칼도 멈춘다
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	if (MeleeTrace)
+	{
+		MeleeTrace->EndTrace();
+	}
+	if (AController* ControllerRef = GetController())
+	{
+		ControllerRef->StopMovement();
+	}
+
+	OnDied.Broadcast(this);
+}
+
+void ACombatCharacterBase::StartRagdoll()
+{
+	if (PartialHitReaction)
+	{
+		PartialHitReaction->StartRagdoll();
+	}
+}
+
 void ACombatCharacterBase::HandleMeleeTraceHit(const FHitResult& Hit)
 {
+	// 같은 편이나 이미 죽은 대상은 맞히지 않는다 (7-1 결정: 같은 편끼리는 칼에 맞지 않음)
+	const ACombatCharacterBase* HitCharacter = Cast<ACombatCharacterBase>(Hit.GetActor());
+	if (!IsHostileTo(Hit.GetActor())
+		|| (HitCharacter && HitCharacter->AbilitySystemComponent->HasMatchingGameplayTag(CombatTags::State_Dead)))
+	{
+		return;
+	}
+
 	FGameplayEventData Payload;
 	Payload.EventTag = CombatTags::Event_Hit;
 	Payload.Instigator = this;
@@ -203,7 +249,7 @@ void ACombatCharacterBase::HandleHitReactEvent(const FGameplayEventData* Payload
 	// 타격 해석 결과(6-4)에서 자기 몫만 꺼내 적용한다: 히트스톱과 밀림(6-5), 부위 물리 반응(6-8). 반응 몽타주는 6-7 GA_HitReact
 	// 셋 다 몸에 생기는 물리 결과라 반응 어빌리티가 막혀도 적용한다(6-7, 6-8 결정). 부위 반응은 컴포넌트가 누운 구간·가드만 거른다
 	const FHitResolution* Resolution = Payload ? UHitResolveSubsystem::FindHitResolution(Payload->TargetData) : nullptr;
-	if (Resolution)
+	if (Resolution && !AbilitySystemComponent->HasMatchingGameplayTag(CombatTags::State_Dead))
 	{
 		// 저스트 회피 성공 (6-13): 보상으로 자신을 뺀 모든 전투 캐릭터가 느려진다. 피해·이동·반응은 없다
 		if (Resolution->Outcome == EHitOutcome::JustDodged)
@@ -504,6 +550,12 @@ void ACombatCharacterBase::BeginPlay()
 		UE_LOG(LogFirstAction, Warning, TEXT("[%s] CharacterData가 없습니다. 블루프린트 기본값에서 지정하세요 (타격 해석에 질량이 필요)"), *GetName());
 	}
 
+	// 팀이 없으면(NoTeam) 누구와도 적이 아니라 맞지도 때리지도 않는다 (7-1)
+	if (TeamId == FGenericTeamId::NoTeam.GetId())
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] Team Id가 NoTeam(255)입니다. 블루프린트 기본값에서 플레이어 0, 적 1로 지정하세요"), *GetName());
+	}
+
 	// 타격 후 이동을 애니메이션 루트 모션에 더하는 연결 지점 (6-5)
 	GetCharacterMovement()->ProcessRootMotionPostConvertToWorld.BindUObject(this, &ACombatCharacterBase::ProcessHitDisplacementRootMotion);
 
@@ -529,6 +581,12 @@ void ACombatCharacterBase::PossessedBy(AController* NewController)
 
 	// 플레이어 컨트롤러나 AI 컨트롤러가 붙은 뒤 ASC가 가진 컨트롤러 정보를 갱신한다
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+	// AI 컨트롤러는 폰의 팀을 스스로 가져오지 않는다(기본 NoTeam). AI 인지가 쓰도록 캐릭터의 팀을 넘긴다 (7-1)
+	if (IGenericTeamAgentInterface* TeamAgent = Cast<IGenericTeamAgentInterface>(NewController))
+	{
+		TeamAgent->SetGenericTeamId(GetGenericTeamId());
+	}
 }
 
 void ACombatCharacterBase::GrantStartupAbilitiesAndEffects()

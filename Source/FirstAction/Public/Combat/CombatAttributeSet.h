@@ -57,4 +57,7 @@ private:
 
 	// 이펙트 실행 직전의 경직치. 범위 제한(0 미만 → 0) 때문에 실행 후 값과 변화량만으로는 이전 값을 알 수 없어서 기록한다
 	float PoiseBeforeExecute = 0.f;
+
+	// 이펙트 적용 전 체력. 0보다 큰 값에서 0이 되는 순간에만 Event.Death를 보낸다 (7-1)
+	float HealthBeforeExecute = 0.f;
 };

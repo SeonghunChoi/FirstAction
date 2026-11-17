@@ -12,12 +12,34 @@ bool UCombatAttributeSet::PreGameplayEffectExecute(FGameplayEffectModCallbackDat
 	{
 		PoiseBeforeExecute = GetPoise();
 	}
+	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	{
+		HealthBeforeExecute = GetHealth();
+	}
 	return Super::PreGameplayEffectExecute(Data);
 }
 
 void UCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
 	Super::PostGameplayEffectExecute(Data);
+
+	// 체력이 0보다 큰 값에서 0이 된 순간 한 번 Event.Death (7-1). 사망 처리는 GA_Death가 한다
+	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	{
+		UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+		if (ASC && HealthBeforeExecute > 0.f && GetHealth() <= 0.f)
+		{
+			FGameplayEventData Payload;
+			Payload.EventTag = CombatTags::Event_Death;
+			Payload.Instigator = Data.EffectSpec.GetContext().GetInstigator();
+			Payload.Target = ASC->GetAvatarActor();
+			Payload.ContextHandle = Data.EffectSpec.GetContext();
+			UE_LOG(LogFirstAction, Log, TEXT("[%s] 체력 0 → Event.Death (공격자 %s)"),
+				*GetNameSafe(ASC->GetAvatarActor()), *GetNameSafe(Payload.Instigator.Get()));
+			ASC->HandleGameplayEvent(Payload.EventTag, &Payload);
+		}
+		return;
+	}
 
 	if (Data.EvaluatedData.Attribute != GetPoiseAttribute())
 	{

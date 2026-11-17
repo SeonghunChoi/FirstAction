@@ -25,6 +25,8 @@ namespace CombatTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Hit, "Event.Hit", "판정 트레이스가 대상을 맞힘 → 공격 어빌리티");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_HitReact, "Event.HitReact", "피해를 받음 → 피격 반응 어빌리티 발동");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Groggy, "Event.Groggy", "경직치가 0이 됨");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Death, "Event.Death", "체력이 0이 됨 → GA_Death (7-1)");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_AttackRequest, "Event.AttackRequest", "공격 요청. OptionalObject = 공격 데이터. AI가 GA_MeleeAttack을 시작한다 (7-1, 규칙 1)");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(SetByCaller_Damage, "SetByCaller.Damage", "GE_Damage 피해량");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(SetByCaller_PoiseDamage, "SetByCaller.PoiseDamage", "GE_Damage 경직치 감소량");
