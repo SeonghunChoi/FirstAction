@@ -86,6 +86,18 @@ public:
 	// 플레이어는 락온 중이면 락온 대상(6-14), AI는 쫓는 대상(Step 7)을 돌려주도록 재정의한다. 이 둘은 거리 밖이어도 돌려준다
 	virtual AActor* FindAttackTarget(float MaxDistance) const;
 
+	// 가드·패리가 성립하는 정면 각도(전체, 도). 0이면 가드가 막지 못한다 (6-10 결정: 캐릭터마다)
+	float GetGuardAngle() const { return GuardAngle; }
+
+	// 입력 태그의 버튼이 지금 눌려 있는가 (가드처럼 누르고 있는 동안 유지하는 어빌리티용, 6-11)
+	bool IsInputTagHeld(const FGameplayTag& InputTag) const { return HeldInputTags.Contains(InputTag); }
+
+	// 이동 입력 입구. 가드 중(State.Guarding)이면 이동 대신 그 방향으로 몸만 돌린다 (6-11 결정)
+	// 플레이어 스틱도, 나중의 AI 이동 요청도 이 입구를 지나므로 가드 어빌리티는 누가 움직이는지 모른다(규칙 1)
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
+
+	virtual void Tick(float DeltaSeconds) override;
+
 	// 회피 방향 (Step 6-9). 기본은 공격 대상 탐색과 같은 기준: 이동 입력(스틱)이 있으면 그 방향, 없으면 정면 (6-9 결정)
 	// AI(Step 7)는 필요하면 재정의한다
 	virtual FVector GetDodgeDirection() const { return GetAttackTargetDirection(); }
@@ -151,6 +163,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting", meta = (ClampMin = "0.0", ClampMax = "360.0", Units = "Degrees"))
 	float AttackTargetConeAngle = 0.f;
 
+	// 가드·패리가 성립하는 정면 각도(전체, 도). 좌우로 절반씩 (6-10 결정). 튜닝값이므로 블루프린트 기본값에서 정한다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0", ClampMax = "360.0", Units = "Degrees"))
+	float GuardAngle = 0.f;
+
+	// 가드 중 스틱 방향으로 도는 속도 (도/초). 0이면 가드 중 돌지 않는다 (6-11 결정). 블루프린트 기본값에서 정한다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0", Units = "DegreesPerSecond"))
+	float GuardTurnRate = 0.f;
+
 	// 대상 탐색의 기준 방향. 이동 입력(플레이어의 스틱)이 있으면 그 방향, 없으면 캐릭터 정면 (6-2 결정)
 	// 이동 입력은 템플릿 Move가 카메라 기준으로 만든 월드 방향이다. AI는 이동 입력이 없으므로 정면이 된다
 	virtual FVector GetAttackTargetDirection() const;
@@ -194,6 +214,13 @@ private:
 	// 실행 중 상태값: 디버깅용으로 보기만 (설계 규칙 9)
 	UPROPERTY(VisibleInstanceOnly, Category = "Combat|Input")
 	FCombatBufferedInput BufferedInput;
+
+	// 지금 눌려 있는 입력 태그 (눌림에 추가, 뗌에 제거)
+	TSet<FGameplayTag> HeldInputTags;
+
+	// 가드 중 이번 프레임에 들어온 이동 입력. Tick에서 그 방향으로 돌고 비운다
+	// (템플릿 이동은 앞뒤·좌우 두 번 나눠 부르므로 모아서 한 번에 처리한다)
+	FVector GuardTurnInput = FVector::ZeroVector;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;

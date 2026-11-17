@@ -43,4 +43,5 @@ namespace CombatTags
 	// GameplayCue 태그는 반드시 "GameplayCue."으로 시작해야 한다
 	FIRSTACTION_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Hit_Dealt);
 	FIRSTACTION_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Hit_Taken);
+	FIRSTACTION_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Hit_Guarded);
 }

@@ -43,8 +43,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// 경직(그로기, 넘어짐 포함) 중에는 공격을 시작하지 못한다 (6-7). 움찔(State.Flinching)은 막지 않아 공격으로 끊고 나갈 수 있다
 	ActivationBlockedTags.AddTag(CombatTags::State_Staggered);
 
-	// 회피 중에는 회피 몽타주의 캔슬 구간(Window.Cancel)에서만 공격으로 이어 간다 (6-9 결정)
+	// 회피·가드 중에는 그 몽타주의 캔슬 구간(Window.Cancel)에서만 공격으로 이어 간다 (6-9, 6-11 결정)
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Dodging);
+	CancelWindowRequiredTags.AddTag(CombatTags::State_Guarding);
 }
 
 const UAttackDataAsset* UGA_MeleeAttack::ResolveStartAttack() const
@@ -348,12 +349,17 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 		SpecHandle.Data->GetContext().AddHitResult(*Hit, true);
 	}
 
-	// GE_Damage의 GameplayCues 목록에 있는 GameplayCue.Hit.Taken도 이때 맞은 쪽에서 발생한다 (Step 6-1)
+	// 피해 경로는 결과와 상관없이 GE_Damage 하나다 (규칙 6-4: 방어 전용 피해 경로 없음). 가드면 체력 값이 0으로 와 있다
 	SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] 피해: %s → %s (체력 %.1f, 경직치 %.1f)"),
-		*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack), *GetNameSafe(Target),
-		Resolution.Damage, Resolution.PoiseDamage);
+	// 맞은 쪽 연출은 결과에 따라 고른다 (6-11): 일반 타격은 Hit.Taken, 가드는 Hit.Guarded
+	// (6-1에서는 GE_Damage의 Cue 목록에 Hit.Taken을 두었으나, 가드에도 같은 GE가 쓰이므로 여기로 옮겼다)
+	const FGameplayTag TakenCue = Resolution.Outcome == EHitOutcome::Guarded ? CombatTags::GameplayCue_Hit_Guarded : CombatTags::GameplayCue_Hit_Taken;
+	TargetASC->ExecuteGameplayCue(TakenCue, SpecHandle.Data->GetContext());
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] %s: %s → %s (체력 %.1f, 경직치 %.1f)"),
+		*GetNameSafe(GetAvatarActorFromActorInfo()), Resolution.Outcome == EHitOutcome::Guarded ? TEXT("가드됨") : TEXT("피해"),
+		*GetNameSafe(CurrentAttack), *GetNameSafe(Target), Resolution.Damage, Resolution.PoiseDamage);
 
 	// --- 결과 적용. 각자 자기 몫만 (규칙 6) ---
 

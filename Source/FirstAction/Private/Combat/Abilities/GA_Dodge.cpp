@@ -20,7 +20,8 @@ UGA_Dodge::UGA_Dodge()
 	ActivationBlockedTags.AddTag(CombatTags::State_Staggered);
 	ActivationBlockedTags.AddTag(CombatTags::State_Dead);
 
-	// 공격·회피·움찔 중이면 그 몽타주의 캔슬 구간에서만 시작한다
+	// 공격·회피·움찔·가드 중이면 그 몽타주의 캔슬 구간에서만 시작한다 (6-9, 6-11 결정)
+	CancelWindowRequiredTags.AddTag(CombatTags::State_Guarding);
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Attacking);
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Dodging);
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Flinching);

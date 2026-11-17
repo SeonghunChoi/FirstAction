@@ -164,6 +164,10 @@ private:
 	// 캐릭터 데이터의 질량 (kg). 없으면 경고 후 기본값
 	static float GetMass(const AActor* Actor);
 
+	// 공격이 맞는 쪽 정면의 가드 각도(캐릭터 블루프린트 기본값, 전체 각도) 안에서 들어왔는가 (6-10 결정)
+	// Direction: 때린 쪽 → 맞은 쪽. 맞은 쪽에서 본 공격 방향은 그 반대
+	static bool IsWithinGuardAngle(const AActor* Victim, const FVector& Direction);
+
 	// 상대 충격량 → 반응 단계. 경계값은 프로젝트 설정 Combat > Hit Reaction (6-7)
 	static EHitReactionStage GetReactionStage(float RelativeImpulse);
 };

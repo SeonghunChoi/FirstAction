@@ -31,4 +31,5 @@ namespace CombatTags
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Hit_Dealt, "GameplayCue.Hit.Dealt", "내가 대상을 맞힘 (때린 쪽 연출: 카메라 흔들림)");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Hit_Taken, "GameplayCue.Hit.Taken", "내가 맞음 (맞은 쪽 연출: 불꽃, 타격음, 카메라 흔들림)");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Hit_Guarded, "GameplayCue.Hit.Guarded", "가드로 막음: 막은 쪽 연출(금속 불꽃, 막는 소리). 공격 어빌리티가 결과에 따라 맞은 쪽에 발생 (6-11)");
 }

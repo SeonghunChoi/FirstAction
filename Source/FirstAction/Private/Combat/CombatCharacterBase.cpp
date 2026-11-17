@@ -120,6 +120,8 @@ void ACombatCharacterBase::AbilityInputTagPressed(FGameplayTag InputTag)
 		return;
 	}
 
+	HeldInputTags.Add(InputTag);
+
 	bool bFound = false;
 	TArray<FGameplayAbilitySpecHandle, TInlineAllocator<4>> HandlesToActivate;
 
@@ -170,6 +172,8 @@ void ACombatCharacterBase::AbilityInputTagReleased(FGameplayTag InputTag)
 	{
 		return;
 	}
+
+	HeldInputTags.Remove(InputTag);
 
 	for (FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
 	{
@@ -328,6 +332,33 @@ void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 버퍼 기록: %s"), *GetName(), *InputTag.ToString());
 
 	OnInputBuffered.Broadcast(InputTag);
+}
+
+void ACombatCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
+{
+	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(CombatTags::State_Guarding))
+	{
+		// 가드 중: 이동하지 않고 방향만 모은다. Tick에서 돈다 (6-11 결정)
+		GuardTurnInput += WorldDirection * ScaleValue;
+		return;
+	}
+	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+}
+
+void ACombatCharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	// 가드 중 스틱 방향으로 정해진 속도로 돈다. DeltaSeconds는 히트스톱에 맞춰 줄어 있으므로 멈춤 중에는 거의 돌지 않는다
+	const FVector TurnDirection = GuardTurnInput.GetSafeNormal2D();
+	GuardTurnInput = FVector::ZeroVector;
+	if (TurnDirection.IsNearlyZero() || GuardTurnRate <= 0.f)
+	{
+		return;
+	}
+	const FRotator Current = GetActorRotation();
+	const FRotator Target(0.f, TurnDirection.Rotation().Yaw, 0.f);
+	SetActorRotation(FMath::RInterpConstantTo(Current, Target, DeltaSeconds, GuardTurnRate));
 }
 
 void ACombatCharacterBase::OnCancelWindowTagChanged(const FGameplayTag Tag, int32 NewCount)

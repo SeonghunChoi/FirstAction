@@ -29,5 +29,7 @@ enum class EHitOutcome : uint8
 	// 일반 타격: 피해, 경직치, 밀림, 반응 모두 적용
 	Hit,
 	// 무적(State.Invulnerable) 중이라 아무 결과도 없음. 때린 쪽도 헛친 것처럼 히트스톱·이동·연출이 없다
-	Evaded
+	Evaded,
+	// 가드(State.Guarding, 정면 각도 안): 체력 피해 0, 경직치·밀림·히트스톱은 일반 타격과 같음, 반응 없음 (6-11)
+	Guarded
 };

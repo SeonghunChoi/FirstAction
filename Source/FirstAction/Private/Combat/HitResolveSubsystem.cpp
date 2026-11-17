@@ -44,6 +44,20 @@ EHitReactionStage UHitResolveSubsystem::GetReactionStage(float RelativeImpulse)
 	return EHitReactionStage::Flinch;
 }
 
+bool UHitResolveSubsystem::IsWithinGuardAngle(const AActor* Victim, const FVector& Direction)
+{
+	const ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(Victim);
+	if (!Character || Character->GetGuardAngle() <= 0.f)
+	{
+		return false;
+	}
+
+	const FVector Forward = Victim->GetActorForwardVector().GetSafeNormal2D();
+	const FVector ToAttacker = (-Direction).GetSafeNormal2D();
+	const float HalfAngleCos = FMath::Cos(FMath::DegreesToRadians(Character->GetGuardAngle() * 0.5f));
+	return FVector::DotProduct(Forward, ToAttacker) >= HalfAngleCos;
+}
+
 FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) const
 {
 	const UCombatSettings* Settings = GetDefault<UCombatSettings>();
@@ -110,8 +124,19 @@ FHitResolution UHitResolveSubsystem::Resolve(const FHitResolveInput& Input) cons
 		Result.PartialReactionVelocity = SwingDirection * (ExcessImpulse * Settings->PartialReactionVelocityPerImpulse);
 	}
 
+	// 방어 규칙 (규칙 6-4): 가드 중이고 정면 각도 안이면 체력 피해만 0, 경직치·밀림·히트스톱은 일반 타격과 같다 (6-11 결정)
+	// 막은 쪽은 자세를 유지한다(반응 없음). 부위 반응도 없다(6-8). 경직치가 0이 되면 그로기가 가드를 깬다(6-7)
+	if (VictimASC && VictimASC->HasMatchingGameplayTag(CombatTags::State_Guarding) && IsWithinGuardAngle(Input.Victim, Result.Direction))
+	{
+		Result.Outcome = EHitOutcome::Guarded;
+		Result.Damage = 0.f;
+		Result.ReactionStage = EHitReactionStage::None;
+		Result.PartialReactionVelocity = FVector::ZeroVector;
+	}
+
 	UE_LOG(LogFirstAction, Log,
-		TEXT("[해석] %s → %s: 질량 %.0f→%.0fkg, 상대 충격량 %.0f(%s), 부위 반응 %.0f, 간격 %.0f→%.0f, 맞은 쪽 밀림 %.0f, 때린 쪽 %s %.0f, 경직치 %.1f"),
+		TEXT("[해석] %s%s → %s: 질량 %.0f→%.0fkg, 상대 충격량 %.0f(%s), 부위 반응 %.0f, 간격 %.0f→%.0f, 맞은 쪽 밀림 %.0f, 때린 쪽 %s %.0f, 경직치 %.1f"),
+		Result.Outcome == EHitOutcome::Guarded ? TEXT("(가드) ") : TEXT(""),
 		*GetNameSafe(Input.Attacker), *GetNameSafe(Input.Victim),
 		GetMass(Input.Attacker), VictimMass, Result.RelativeImpulse, *UEnum::GetDisplayValueAsText(Result.ReactionStage).ToString(),
 		Result.PartialReactionVelocity.Size(),
