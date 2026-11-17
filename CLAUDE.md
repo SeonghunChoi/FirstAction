@@ -414,8 +414,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 7-1: `AEnemyCharacter`(같은 `ACombatCharacterBase`, AI 컨트롤러 자동 빙의, `RequestAttack` → `Event.AttackRequest` 페이로드로 `GA_MeleeAttack` 시작, 시험용 배치별 `TestAttack`/`TestAttackInterval`, 사망 후 `DeathRemovalTime` 뒤 제거, `OnEnemyDied`). 편은 `IGenericTeamAgentInterface`(캐릭터 BP `TeamId`, AI 컨트롤러에 빙의 시 전달, 같은 편 판정 제외). `GA_Death`(`Event.Death` 트리거, `State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌), 속성 세트가 체력 0 전환 순간 `Event.Death`. 캐릭터 데이터 `DeathMontage`, `A_UAL1_Death01`/`AM_UAL1_Death01`, `DA_Character_Enemy`, `Portfolio/Characters/BP_Enemy`. 확인: 적 공격이 플레이어에게 일반 타격(Stagger)·가드·그로기로 가드 깨짐·패리(적 반동 경직)·저스트 회피(슬로모션)로 갈림, 같은 편 더미는 대상이 아님, 적 사망 → 래그돌(2.2초) → 제거(5초). 미확인: 플레이어 사망, 사망 시 락온 다음 대상 (2026-11-17)
 
+- [x] Step 7-2 (설계 판단): 적 AI는 StateTree. 경직 중 공격 토큰은 토큰 관리자가 태그를 보고 반납. 코드 변경 없음 (2026-11-18)
+
 ### 현재 위치
-- **Step 7-2** 시작 전: 설계 판단 StateTree / Behavior Tree
+- **Step 7-3** 시작 전: StateTree 상태 구성 (접근, 측면 이동, 공격, 회복, 경직, 사망)
 - Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 7-1 플레이어 사망, 사망 시 락온 다음 대상(6-14)
 
 ### 결정 기록
@@ -472,6 +474,8 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 락온은 R3 토글, 카메라 정면 각도가 가장 작은 적(15m 안), 락온 중 오른쪽 스틱 튕김으로 대상 바꾸기(6-14). 플레이어 컴포넌트라 입력 태그 없이 `IA_LockOn`을 캐릭터가 직접 받는다
 - 2026-11-17: 락온 중 카메라는 좌우만 대상 쪽으로(속도 BP 기본값), 이동은 평소처럼, 공격은 `FindAttackTarget` 재정의로 락온 대상(6-14)
 - 2026-11-17: 락온은 재입력·사망·범위 이탈(18m)로 풀리고, 대상이 죽으면 다음 대상으로(6-14). 표시는 디버그 구(`FirstAction.ShowLockOn`)
+- 2026-11-18: 적 AI는 StateTree(7-2). 적은 "지금 어느 상태인가"를 기억하고 조건이 맞을 때만 옮긴다(맴돌기 방향·시간 유지, 경직이 끝나면 정해진 상태로 복귀). 템플릿 `CombatAIController`와 이동·보조 태스크를 고쳐 쓴다
+- 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지
 - 2026-11-17: 적은 `Event.AttackRequest`(페이로드 = 공격 데이터)로 공격을 요청한다(7-1). AI 전 시험용 배치별 `TestAttack`
