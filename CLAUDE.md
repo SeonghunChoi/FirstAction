@@ -148,7 +148,7 @@
 | `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
 | `AttackTarget` (Motion Warping 목표 이름) | 공격 몽타주의 Motion Warping 구간 `Warp Target Name`. `GA_MeleeAttack`이 구간 시작마다 등록 |
 | `Attack Reach` (`ANS_AttackReach`) | 워핑 구간 시작을 덮게 두는 휘두름별 멈출 간격(`StopGap` cm). 워핑 구간과 같은 몽타주에 둔다 |
-| `Window.Combo`, `Window.Cancel`, `State.Invulnerable`, `State.Downed` | `ANS_TagWindow`가 붙이는 태그 (`Window.Cancel`은 공격·회피·움찔 몽타주에서 다른 행동으로 끊을 수 있는 구간, `State.Invulnerable`은 회피 몽타주의 무적 구간, `State.Downed`는 넘어짐 몽타주의 누운 구간) |
+| `Window.Combo`, `Window.Cancel`, `Window.Parry`, `Window.JustDodge`, `State.Invulnerable`, `State.Downed` | `ANS_TagWindow`가 붙이는 태그 (`Window.Parry`는 가드 시작 몽타주 앞부분, `Window.JustDodge`는 회피 몽타주 무적 구간 앞부분, `Window.Cancel`은 공격·회피·움찔 몽타주에서 다른 행동으로 끊을 수 있는 구간, `State.Invulnerable`은 회피 몽타주의 무적 구간, `State.Downed`는 넘어짐 몽타주의 누운 구간) |
 
 ---
 
@@ -396,8 +396,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 6-9: `UCombatGameplayAbility`(`CancelWindowRequiredTags`: 이 태그가 있으면 `Window.Cancel`도 있어야 시작), `GA_Dodge`(스틱 방향으로 즉시 돌려 앞구르기, 없으면 정면, `State.Dodging`, 경직 중 막힘, 공격·회피·움찔 중엔 캔슬 구간에서만, 연속 구르기 `bRetriggerInstancedAbility`), `GA_MeleeAttack` 부모 교체·회피 중엔 캔슬 구간에서만. 매니저 `EHitOutcome::Evaded`(`State.Invulnerable`이면 결과 0, 때린 쪽 헛침). 캐릭터가 `Window.Cancel`이 붙는 순간 버퍼 입력 재시도, 실행 중 어빌리티도 재시작 시도. `State.Flinching`, 캐릭터 데이터 `DodgeMontage`. 몽타주: `AM_UAL1_Roll`(무적, 캔슬 구간), 공격 4개·움찔 2개에 `Window.Cancel`. 확인: 방향, 공격 캔슬, 선입력(캔슬 구간에서 소비), 연속 구르기, 회피 → 강공격. 알려진 현상: 연속 구르기 직후 12ms 만에 한 번 더 재시작된 경우 1회. 재시험(연타)에서는 재시작 45ms 뒤 입력이 버퍼로 가서 재현되지 않음 → 이전 몽타주의 `Window.Cancel`이 떨어지기까지 약 1프레임 틈으로 추정, 6-15에서 다시 확인 (2026-11-17)
 
+- [x] Step 6-10 (설계 판단): 패리는 가드 시작 몽타주 앞부분 `Window.Parry`, 저스트 회피는 회피 무적 구간 앞부분 `Window.JustDodge`, 좁은 창 우선, 가드·패리는 정면 각도 안에서만(캐릭터 BP 기본값), 연타 패리는 가드 내리기 동작으로 막음. 코드 변경 없음 (2026-11-17)
+
 ### 현재 위치
-- **Step 6-10** 시작 전: 설계 판단 `Window.Parry`, `Window.JustDodge` 구간 위치
+- **Step 6-11** 시작 전: `GA_Guard`와 가드 규칙 (간격 유지, 피해 감소)
 - Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 6-9 무적(`Evaded`, 헛친 느낌), 경직 중 회피 금지
 
 ### 결정 기록
@@ -436,6 +438,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 회피는 스틱 방향으로 몸을 즉시 돌려 앞구르기, 스틱을 놓으면 정면(6-9). 회피 몽타주는 `UCombatCharacterData::DodgeMontage`
 - 2026-11-17: 무적은 매니저 규칙(6-9). `State.Invulnerable`이면 결과 `Evaded`: 피해·반응 없음, 때린 쪽은 헛친 느낌(히트스톱·이동·Cue 없음). 방어 규칙도 `EHitOutcome`으로 같은 자리에 올린다
 - 2026-11-17: 경직 중 회피는 막고, 공격·회피·움찔 중에는 그 몽타주의 캔슬 구간에서만 회피(와 회피 중 공격)를 허용한다(6-9). 공통 기반 `UCombatGameplayAbility::CancelWindowRequiredTags`, 움찔 표시 `State.Flinching`
+- 2026-11-17: 패리는 가드를 올리는 순간 성립(6-10). 가드 시작 몽타주 앞부분에 `Window.Parry`, 그 뒤는 가드
+- 2026-11-17: 저스트 회피 구간은 회피 몽타주 무적 구간의 앞부분(6-10). 겹치면 좁은 창이 이긴다(저스트 회피 > 일반 회피, 패리 > 가드)
+- 2026-11-17: 가드와 패리는 맞는 쪽 정면 각도 안에서만 성립(6-10). 각도는 캐릭터 블루프린트 기본값
+- 2026-11-17: 연타 패리는 가드 내리기 동작으로 막는다(6-10). RB를 떼면 가드 내리기 몽타주, 그 캔슬 구간 전에는 다시 가드 불가
 - 2026-11-17: 워핑 대상은 몽타주 시작이 아니라 Motion Warping 구간이 시작될 때마다 다시 묻는다(6-6에서 발견). 한 몽타주에 여러 번 휘두르는 `Heavy_Combo`가 2타부터 낡은 목표로 워핑되던 문제
 - 2026-11-16: 타격 후 이동 시간은 공격 데이터에 둔다(6-5). 애니메이션 루트 모션이 재생 중이면 Root Motion Source가 무시되므로(엔진 소스 확인), 양쪽 모두 `ProcessRootMotionPostConvertToWorld`에서 루트 모션에 이동량을 더하고, 루트 모션 몽타주가 없을 때만 Root Motion Source(Override)로 옮긴다
 - 2026-11-16: 간격 분배는 맞은 쪽 밀림 거리를 상대 충격량으로 먼저 정하고, 때린 쪽이 나머지(PostHitSpacing − 맞은 순간 간격 − 맞은 쪽 거리)를 맞춘다(6-4). 작은 적에서는 때린 쪽이 전진, 큰 적에서는 뒤로 밀린다. 밀림 거리는 상대 충격량에 단순 비례하고, 계수(밀림, 경직치)는 프로젝트 설정(`UDeveloperSettings`)에 둔다. `FHitResolution`은 전용 타깃 데이터로 `Event.HitReact`에 실어 맞은 쪽에 보내고, 매니저는 상태를 기억하지 않는다
