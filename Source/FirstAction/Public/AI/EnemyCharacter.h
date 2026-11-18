@@ -9,6 +9,7 @@
 #include "EnemyCharacter.generated.h"
 
 class UAttackDataAsset;
+class UEnemyPatternDataAsset;
 
 // 사망 알림 (템플릿 ACombatEnemy의 FOnEnemyDied와 같은 모양, 이름은 겹치지 않게). 스포너가 전멸을 세는 데 쓴다
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEnemyCharacterDied);
@@ -22,6 +23,11 @@ public:
 	AEnemyCharacter();
 
 	virtual void HandleDeathStarted() override;
+
+	// 공격 워핑 대상 = AI가 쫓는 대상 (6-2 결정). AI 대상이 없으면 기반 클래스의 정면 원뿔 탐색(시험 공격용)
+	virtual AActor* FindAttackTarget(float MaxDistance) const override;
+
+	const UEnemyPatternDataAsset* GetPatternData() const { return PatternData; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Combat|Enemy")
 	FOnEnemyCharacterDied OnEnemyDied;
@@ -37,6 +43,10 @@ protected:
 	// 사망 후 레벨에서 제거되기까지의 시간 (초, 템플릿 DeathRemovalTime). 블루프린트 기본값에서 정한다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Enemy", meta = (ClampMin = "0.0", Units = "s"))
 	float DeathRemovalTime = 0.f;
+
+	// 적 종류의 패턴 데이터: 인지·반응 성향(7-3), 패턴 목록(7-4). AI 컨트롤러가 빙의할 때 읽는다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Enemy")
+	TObjectPtr<const UEnemyPatternDataAsset> PatternData;
 
 	// 시험용 공격 (AI 전): 레벨에 놓은 적마다 정하면 TestAttackInterval마다 이 공격을 요청한다 (규칙 9: 배치별 초기값)
 	// 플레이어 쪽 가드·패리·회피·피격 반응을 적 AI 없이 시험한다. 비워 두면 공격하지 않는다

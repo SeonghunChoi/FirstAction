@@ -187,7 +187,8 @@ Source/FirstAction/
 │   │   └── CombatInputConfig.h        // 입력 액션 → 입력 태그
 │   ├── AI/
 │   │   ├── EnemyCharacter.h           // 적: 같은 기반 클래스, 사망 후 제거, 공격 요청 (7-1)
-│   │   ├── EnemyPatternDataAsset.h
+│   │   ├── EnemyAIController.h        // 인지(시각, 피해)와 바라보기, 대상 (7-3)
+│   │   ├── EnemyPatternDataAsset.h    // 적 종류 하나 = 한 장: 인지·반응 성향(7-3), 패턴 목록(7-4)
 │   │   ├── CombatTokenSubsystem.h
 │   │   └── StateTree/                 // StateTree 태스크, 조건
 │   └── Content/
@@ -416,8 +417,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 7-2 (설계 판단): 적 AI는 StateTree. 경직 중 공격 토큰은 토큰 관리자가 태그를 보고 반납. 코드 변경 없음 (2026-11-18)
 
+- [x] Step 7-3 (1/2 인지): `UEnemyPatternDataAsset`(`SightRadius` 1500, `LoseSightRadius` 1800, `PeripheralVisionHalfAngle` 70, `TargetMemoryTime` 5, `ReactionTime` 0.6, `ProximityAwarenessRadius` 300), `AEnemyAIController`(시각은 적만, 피해 감각, 빙의할 때 패턴 데이터와 팀으로 인지 갱신, 반응 시간·근접 감지·기억 시간에 따른 Focus, 콘솔 `FirstAction.ShowEnemyAI`), 캐릭터가 `Event.HitReact`에서 `ReportDamageEvent`, `AEnemyCharacter`(`PatternData`, 컨트롤러 방향으로 회전 360°/초, `FindAttackTarget` = AI 대상). `Portfolio/Data/Enemies/DA_Pattern_Enemy`. 확인: 보임·놓침·반응 시간·기억 시간, 등 뒤에서 맞으면 즉시 잡고 돌아섬, 근접 감지 거리 안팎 전환과 돌아섬, 더미는 대상 아님, 시험 공격이 AI 대상으로 워핑 (2026-11-18)
+
 ### 현재 위치
-- **Step 7-3** 시작 전: StateTree 상태 구성 (접근, 측면 이동, 공격, 회복, 경직, 사망)
+- **Step 7-3 (2/2)** 시작 전: StateTree 상태 구성 (접근, 측면 이동, 공격, 회복, 경직, 사망)
 - Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 7-1 플레이어 사망, 사망 시 락온 다음 대상(6-14)
 
 ### 결정 기록
@@ -475,6 +478,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-17: 락온 중 카메라는 좌우만 대상 쪽으로(속도 BP 기본값), 이동은 평소처럼, 공격은 `FindAttackTarget` 재정의로 락온 대상(6-14)
 - 2026-11-17: 락온은 재입력·사망·범위 이탈(18m)로 풀리고, 대상이 죽으면 다음 대상으로(6-14). 표시는 디버그 구(`FirstAction.ShowLockOn`)
 - 2026-11-18: 적 AI는 StateTree(7-2). 적은 "지금 어느 상태인가"를 기억하고 조건이 맞을 때만 옮긴다(맴돌기 방향·시간 유지, 경직이 끝나면 정해진 상태로 복귀). 템플릿 `CombatAIController`와 이동·보조 태스크를 고쳐 쓴다
+- 2026-11-18: StateTree는 몸 상태를 조건으로 본다(7-3). 전이 조건이 적 ASC의 상태 태그를 확인한다(토큰 관리자와 같은 출처)
+- 2026-11-18: 적 AI 대상은 AI Perception 시각 감지로 본 적(팀 태도 Hostile)(7-3). 보지도 맞지도 않은 채 기억 시간이 지나면 놓는다
+- 2026-11-18: 시야에서 사라진 대상에는 반응 시간 뒤에 돌아서고, 맞으면 Damage 감각으로 즉시 돈다(7-3). 반응 시간은 적마다 데이터값
+- 2026-11-18: 돌아선 뒤 근접 감지 거리(몸 간격) 안이면 대상의 지금 위치를, 밖이면 마지막으로 안 위치만 안다(7-3). 근접전에서는 찾아내고 멀리 빠져나가면 따돌릴 수 있다
+- 2026-11-18: AI 성향 값(인지, 반응)은 `UEnemyPatternDataAsset` 한 장에 패턴 목록과 함께 둔다(7-3). 적 종류 하나 = 패턴 데이터 한 장
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

@@ -9,6 +9,7 @@
 #include "Engine/CollisionProfile.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Perception/AISense_Damage.h"
 #include "GameplayEffect.h"
 #include "Combat/CombatAttributeSet.h"
 #include "Combat/MeleeTraceComponent.h"
@@ -256,6 +257,12 @@ void ACombatCharacterBase::HandleHitReactEvent(const FGameplayEventData* Payload
 		{
 			StartJustDodgeSlow();
 			return;
+		}
+
+		// AI의 피해 감각에 때린 쪽을 알린다 (7-3): 시야 밖에서 맞아도 적 AI가 즉시 돌아선다. 플레이어에게는 듣는 쪽이 없어 아무 일도 없다
+		if (AActor* Attacker = const_cast<AActor*>(Payload->Instigator.Get()))
+		{
+			UAISense_Damage::ReportDamageEvent(this, this, Attacker, 1.f, Attacker->GetActorLocation(), Resolution->Hit.ImpactPoint);
 		}
 
 		ApplyHitStop(Resolution->VictimHitStop);
