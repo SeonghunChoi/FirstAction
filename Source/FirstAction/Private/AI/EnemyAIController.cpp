@@ -5,6 +5,7 @@
 #include "AI/EnemyCharacter.h"
 #include "AI/EnemyPatternDataAsset.h"
 #include "Combat/CombatTags.h"
+#include "Components/StateTreeAIComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
@@ -35,8 +36,13 @@ AEnemyAIController::AEnemyAIController(const FObjectInitializer& ObjectInitializ
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// EQS(2/2 맴돌기)가 폰 위치를 기준으로 돌도록 폰에 붙인다 (템플릿 ACombatAIController와 같음)
+	// 템플릿 ACombatAIController와 같다: 폰에 붙이고, 빙의할 때 StateTree를 시작한다
 	bAttachToPawn = true;
+	bStartAILogicOnPossess = true;
+
+	StateTreeAI = CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("StateTreeAI"));
+	// 폰이 없을 때(BeginPlay) 먼저 시작하지 않게 한다. 시작은 빙의할 때 한 번
+	StateTreeAI->SetStartLogicAutomatically(false);
 
 	UAIPerceptionComponent* Perception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception"));
 
@@ -62,6 +68,13 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 	ApplyPatternData();
 
+	// Super가 StateTree를 시작한다(bStartAILogicOnPossess). 트리 에셋이 비었거나 컨텍스트가 맞지 않으면 엔진은 조용히 멈추므로 여기서 알린다
+	if (StateTreeAI && !StateTreeAI->IsRunning())
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] StateTree가 시작되지 않음 (%s의 StateTreeAI 컴포넌트에 State Tree가 지정되었는지, 스키마가 맞는지 확인)"),
+			*GetNameSafe(InPawn), *GetClass()->GetName());
+	}
+
 	if (UAIPerceptionComponent* Perception = GetPerceptionComponent())
 	{
 		Perception->OnTargetPerceptionUpdated.AddUniqueDynamic(this, &AEnemyAIController::HandleTargetPerceptionUpdated);
@@ -71,6 +84,13 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 void AEnemyAIController::OnUnPossess()
 {
 	ClearCombatTarget(TEXT("빙의 해제"));
+
+	// 엔진은 Super에서 폰을 비운 뒤 StateTree를 멈춰 컨텍스트(Actor)를 찾지 못한다는 경고를 남긴다. 폰이 있을 때 먼저 멈춘다
+	if (StateTreeAI)
+	{
+		StateTreeAI->StopLogic(TEXT("빙의 해제"));
+	}
+
 	Super::OnUnPossess();
 }
 

@@ -1,5 +1,5 @@
 // 적 AI 컨트롤러 (Step 7-3). 템플릿 ACombatAIController 자리를 대신한다
-// 1/2: 인지와 바라보기. 무엇을 할지(접근, 맴돌기, 공격, 회복)는 2/2에서 StateTree가 정한다
+// 1/2: 인지와 바라보기. 2/2: 무엇을 할지(접근, 맴돌기, 공격, 회복)는 StateTree가 정한다 (UStateTreeAIComponent, 트리 에셋은 BP에서)
 //
 // 대상 (7-3 결정)
 //   - AI Perception 시각 감지로 "보인 적"(팀 태도 Hostile)을 대상으로 잡는다 (질문 2 B)
@@ -20,6 +20,7 @@
 class UAISenseConfig_Sight;
 class UAISenseConfig_Damage;
 class UEnemyPatternDataAsset;
+class UStateTreeAIComponent;
 
 UCLASS()
 class FIRSTACTION_API AEnemyAIController : public AAIController
@@ -37,9 +38,22 @@ public:
 	// 대상이 지금 시야 안에 있는가
 	bool IsCombatTargetVisible() const { return bTargetVisible; }
 
+	// 대상과의 몸 간격 (중심 거리 − 양쪽 캡슐 반지름). 워핑·공격 대상 탐색과 같은 기준. 대상이 없으면 아주 큰 값
+	float GetTargetGap() const { return GetBodyGap(CombatTarget.Get()); }
+
+	// 몸 간격 (중심 거리 − 양쪽 캡슐 반지름)
+	float GetBodyGap(const AActor* Target) const;
+
+	// 폰의 패턴 데이터. 지정하지 않았으면 클래스 기본값
+	const UEnemyPatternDataAsset* GetPatternData() const;
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
+
+	// 무엇을 할지 고르는 StateTree. 트리 에셋은 블루프린트 자식(BP_EnemyAIController)에서 지정한다
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
+	TObjectPtr<UStateTreeAIComponent> StateTreeAI;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;
@@ -60,10 +74,6 @@ private:
 	void DrawDebug() const;
 
 	bool IsPawnDead() const;
-
-	// 몸 간격 (중심 거리 − 양쪽 캡슐 반지름). 워핑·공격 대상 탐색과 같은 기준
-	float GetBodyGap(const AActor* Target) const;
-	const UEnemyPatternDataAsset* GetPatternData() const;
 
 	TWeakObjectPtr<AActor> CombatTarget;
 

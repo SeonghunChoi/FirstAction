@@ -21,6 +21,10 @@ AEnemyCharacter::AEnemyCharacter()
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 	GetCharacterMovement()->bUseControllerDesiredRotation = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 360.f, 0.f);
+
+	// 길찾기 이동(MoveTo)도 가속도로 움직인다. 기본값은 속도를 바로 넣어 가속도가 0이라,
+	// 가속도로 걷기를 판단하는 ABP_Unarmed(Should Move)가 대기 자세로 남아 미끄러져 보인다 (템플릿 BP_CombatEnemy도 켬)
+	GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
 }
 
 AActor* AEnemyCharacter::FindAttackTarget(float MaxDistance) const

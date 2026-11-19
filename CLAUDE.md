@@ -190,7 +190,8 @@ Source/FirstAction/
 │   │   ├── EnemyAIController.h        // 인지(시각, 피해)와 바라보기, 대상 (7-3)
 │   │   ├── EnemyPatternDataAsset.h    // 적 종류 하나 = 한 장: 인지·반응 성향(7-3), 패턴 목록(7-4)
 │   │   ├── CombatTokenSubsystem.h
-│   │   └── StateTree/                 // StateTree 태스크, 조건
+│   │   └── StateTree/
+│   │       └── EnemyStateTreeNodes.h  // 적 AI 조건(태그, 대상, 거리)과 태스크(접근, 맴돌기, 공격, 회복) (7-3)
 │   └── Content/
 │       ├── CombatContentSet.h
 │       └── PortfolioContentSettings.h
@@ -419,8 +420,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 7-3 (1/2 인지): `UEnemyPatternDataAsset`(`SightRadius` 1500, `LoseSightRadius` 1800, `PeripheralVisionHalfAngle` 70, `TargetMemoryTime` 5, `ReactionTime` 0.6, `ProximityAwarenessRadius` 300), `AEnemyAIController`(시각은 적만, 피해 감각, 빙의할 때 패턴 데이터와 팀으로 인지 갱신, 반응 시간·근접 감지·기억 시간에 따른 Focus, 콘솔 `FirstAction.ShowEnemyAI`), 캐릭터가 `Event.HitReact`에서 `ReportDamageEvent`, `AEnemyCharacter`(`PatternData`, 컨트롤러 방향으로 회전 360°/초, `FindAttackTarget` = AI 대상). `Portfolio/Data/Enemies/DA_Pattern_Enemy`. 확인: 보임·놓침·반응 시간·기억 시간, 등 뒤에서 맞으면 즉시 잡고 돌아섬, 근접 감지 거리 안팎 전환과 돌아섬, 더미는 대상 아님, 시험 공격이 AI 대상으로 워핑 (2026-11-18)
 
+- [x] Step 7-3 (2/2 StateTree): `EnemyStateTreeNodes`(조건 `Enemy Has Tag`/`Enemy Has Target`/`Enemy Target Farther Than`, 태스크 `Enemy Approach`(MoveTo)/`Enemy Strafe`(대상 둘레 옆걸음, 앞을 구로 검사해 막히기 전 방향 전환)/`Enemy Attack`(`MaxWarpDistance` 안까지 걸어 들어가 `RequestAttack`)/`Enemy Recover`), 패턴 데이터 `Engage` 값(`StrafeDistance` 250, `MaxStrafeDistance` 450, 맴돌기 1.5~3초, 속도 180/400, 검사 80, 회복 1초), `AEnemyAIController`에 `UStateTreeAIComponent`(빙의할 때 시작, 시작 실패 경고, 빙의 해제 전에 멈춤), 적 길찾기 이동에 가속도(`bUseAccelerationForPaths`, 애니메이션이 걷기로 바뀜). `Portfolio/AI/ST_Enemy`(Dead, Staggered, Idle, Engage > Approach/Strafe/Attack/Recover), `BP_EnemyAIController`, `Lvl_Training`에 Nav Mesh Bounds Volume. StateTree 노드 칸 Category `Input`은 바인딩 전용이라 값을 넣을 칸은 `Parameter`로. 확인: 다가감 → 맴돌기 → 걸어 들어가 공격 → 회복 반복, 멀어지면 다시 다가감, 더미 앞에서 방향 전환, 경직에서 맴돌기로 복귀, 플레이어 반격에 공격 끊김, 사망 → 래그돌 → 제거 (2026-11-19)
+
 ### 현재 위치
-- **Step 7-3 (2/2)** 시작 전: StateTree 상태 구성 (접근, 측면 이동, 공격, 회복, 경직, 사망)
+- **Step 7-4** 시작 전: `UEnemyPatternDataAsset` 패턴 목록과 패턴 선택 태스크(유틸리티 점수, 결과를 `Enemy Attack`의 `Attack`에 바인딩)
 - Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 7-1 플레이어 사망, 사망 시 락온 다음 대상(6-14)
 
 ### 결정 기록
@@ -483,6 +486,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-18: 시야에서 사라진 대상에는 반응 시간 뒤에 돌아서고, 맞으면 Damage 감각으로 즉시 돈다(7-3). 반응 시간은 적마다 데이터값
 - 2026-11-18: 돌아선 뒤 근접 감지 거리(몸 간격) 안이면 대상의 지금 위치를, 밖이면 마지막으로 안 위치만 안다(7-3). 근접전에서는 찾아내고 멀리 빠져나가면 따돌릴 수 있다
 - 2026-11-18: AI 성향 값(인지, 반응)은 `UEnemyPatternDataAsset` 한 장에 패턴 목록과 함께 둔다(7-3). 적 종류 하나 = 패턴 데이터 한 장
+- 2026-11-19: 경직 상태는 `State.Staggered`·`Downed`·`Groggy` 묶음, 움찔은 빼서 AI가 하던 일을 계속한다(7-3)
+- 2026-11-19: 유틸리티 점수 선택은 7-4 패턴 선택 태스크에서만 쓴다. 상태 흐름은 StateTree 전이(7-3)
+- 2026-11-19: 맴돌기는 대상을 바라본 채 `StrafeDistance`를 유지하는 옆걸음, 앞을 검사해 막히기 전에 방향을 바꾼다(7-3)
+- 2026-11-19: 공격은 그 공격의 `MaxWarpDistance` 안까지 걸어 들어간 뒤 요청한다. 나머지는 워핑(7-3)
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지
