@@ -56,4 +56,10 @@ public:
 
 	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Defense", meta = (ClampMin = "0.0", Units = "s"))
 	float JustDodgeSlowDuration = 0.f;
+
+	// 공격 토큰 우선순위의 각도 벌점 (7-5 질문 4 C). 단위 cm/도
+	// 우선순위 비용 = 대상과의 몸 간격(cm) + 대상 시선에서 벗어난 각도(도) × 이 값. 작은 쪽이 먼저 토큰을 받는다
+	// 예: 3이면 등 뒤(180°)의 적은 정면의 적보다 5.4m 먼 것과 같다
+	UPROPERTY(config, EditAnywhere, BlueprintReadOnly, Category = "Attack Tokens", meta = (ClampMin = "0.0"))
+	float AttackTokenAnglePenalty = 0.f;
 };

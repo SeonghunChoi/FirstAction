@@ -55,6 +55,11 @@ struct FEnemyAttackPattern
 	// 유틸리티 점수 3: 반복 방지. 쓴 직후 0에서 이 시간에 걸쳐 1로 돌아온다. 0이면 반복 방지 없음
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pattern|Score", meta = (ClampMin = "0.0", Units = "s"))
 	float RepeatCooldown = 4.f;
+
+	// 이 패턴을 쓰려면 쥐어야 하는 대상의 공격 토큰 수 (7-5 질문 5 B). 위협이 큰 패턴은 크게
+	// 고르는 순간 대상의 남은 토큰보다 크면 후보에서 빠진다
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pattern|Token", meta = (ClampMin = "1"))
+	int32 TokenCost = 1;
 };
 
 UCLASS(BlueprintType)

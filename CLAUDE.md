@@ -424,9 +424,12 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 7-4: `UEnemyPatternDataAsset`에 `Patterns`(`FEnemyAttackPattern`: 시작 공격, 이어 갈 입력 태그 순서, 가중치, 거리 범위, 반복 방지 시간), `ComboInputDelayMin/Max`, `ComboContinueRule`(`Always`/`OnHitOrGuard`). StateTree 태스크 `Enemy Select Pattern`(가중치 × 거리 × 반복 방지 점수에 비례해 무작위, 출력 `PatternIndex`), `Enemy Attack`이 `PatternIndex`를 받아 시작 공격 후 `Window.Combo`마다 지연 뒤 `AbilityInputTagPressed`로 입력. 컨트롤러가 패턴별 마지막 사용 시각, 캐릭터가 `AttackConnectCount`(맞힘·가드됨). `DA_Pattern_Enemy`에 `Light3`/`LightHeavy`/`Heavy`, `ST_Enemy` Attack 상태에 선택 태스크(앞)와 바인딩, `BP_Enemy` `InputBufferDuration` 0.3(0이면 콤보 입력이 버려짐). 확인: 비율 50/33/17%, 반복 점수 하락, 간격 379에서 `Heavy`만 후보, 약-약-약·약-약-강 콤보. 미확인: 엘리트 규칙(`OnHitOrGuard`)은 Step 8-1에서 (2026-11-19)
 
+- [x] Step 7-5: `UCombatTokenSubsystem : UTickableWorldSubsystem`(대상마다 토큰, `RequestTurn`/`AcquireTokens`/`ReleaseTokens`, 매 틱 경직·사망·사라진 보유자 회수, 콘솔 `FirstAction.ShowAttackTokens`). `UCombatCharacterData::AttackTokens`(플레이어 2), 패턴 `TokenCost`(`Heavy` 2), 프로젝트 설정 `AttackTokenAnglePenalty` 3. StateTree: `Enemy Strafe`가 시간이 끝나면 차례를 받을 때까지 계속 맴돌고, `Enemy Select Pattern`이 살 수 있는 패턴만 골라 토큰을 쥐며(공격 상태가 실패·끊기면 반납), `Enemy Recover`가 끝날 때 반납. `Portfolio/Maps/Lvl_TestEnemies`(적 4체, `Lvl_Training`의 적은 이쪽으로 옮김). 확인: 4체 중 동시 공격 2체, `Heavy`는 혼자, 남은 토큰 1이면 `Heavy` 제외, 회복 끝 반납, 경직 회수 2회, 오래 기다린 먼 적보다 가까운 적이 먼저, 플레이어 사망 시 반납. 플레이어 사망(7-1 미확인분) 확인 (2026-11-19)
+- [x] ✅ Step 7 마일스톤: 일반 적 4체 중 플레이어 토큰 수(2)만큼만 동시에 공격한다 (2026-11-19)
+
 ### 현재 위치
-- **Step 7-5** 시작 전: `UCombatTokenSubsystem`(동시 공격 수 제한, 맴돌기 → 공격 전이에 토큰, 경직되면 토큰 관리자가 태그를 보고 반납)
-- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 7-1 플레이어 사망, 사망 시 락온 다음 대상(6-14)
+- **Step 7 마무리** 점검 전: 아래 다시 확인할 것 목록을 적과 싸우며 점검한 뒤 Step 8-1(엘리트 적, 엘리트 콤보 규칙 `OnHitOrGuard` 확인 포함)
+- Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
 
 ### 결정 기록
 - 2026-11-14: 역기획 레퍼런스는 데빌 메이 크라이의 타격 반응(밀려나는 적, 콤보 마무리 타격)
@@ -496,6 +499,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-19: 적 콤보 입력은 구간이 열린 뒤 무작위 지연 뒤에, 지연 범위는 적마다 패턴 데이터(7-4)
 - 2026-11-19: 콤보를 이어 가는 조건은 적마다(7-4). 일반형은 끝까지, 엘리트는 앞 타가 맞거나 막혔을 때만 잇고 헛치면 멈춘다
 - 2026-11-19: 패턴 점수는 가중치 × 거리 × 반복 방지, 점수에 비례해 무작위로 고른다(7-4). 대상 상태 점수는 배포 빌드에서
+- 2026-11-19: 공격 토큰은 공격받는 대상마다 따로, 수는 대상의 `UCombatCharacterData::AttackTokens`(7-5)
+- 2026-11-19: 토큰은 걸어 들어가기 시작부터 회복이 끝날 때까지 쥔다(7-5). 공격 상태가 실패하거나 끊겨도 돌려준다
+- 2026-11-19: 토큰은 기다리는 적 중 대상에게 가깝고 대상 시선 정면인 적부터 준다(7-5). 각도 벌점은 세계 규칙(`AttackTokenAnglePenalty`). 토큰이 없으면 맴돌기를 계속한다
+- 2026-11-19: 패턴마다 토큰 비용(`TokenCost`), 남은 토큰보다 비싼 패턴은 고를 수 없다(7-5)
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

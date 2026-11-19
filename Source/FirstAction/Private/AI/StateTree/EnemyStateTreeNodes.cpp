@@ -1,6 +1,7 @@
 #include "AI/StateTree/EnemyStateTreeNodes.h"
 
 #include "AbilitySystemComponent.h"
+#include "AI/CombatTokenSubsystem.h"
 #include "AI/EnemyAIController.h"
 #include "AI/EnemyCharacter.h"
 #include "AI/EnemyPatternDataAsset.h"
@@ -56,6 +57,36 @@ namespace
 		}
 		return true;
 	}
+
+	UCombatTokenSubsystem* GetTokens(const AEnemyAIController* Controller)
+	{
+		const UWorld* World = Controller ? Controller->GetWorld() : nullptr;
+		return World ? World->GetSubsystem<UCombatTokenSubsystem>() : nullptr;
+	}
+
+	// 공격하지 않는 상태(다가감, 맴돌기)에 들어가면 혹시 남은 토큰을 정리한다 (7-5)
+	// 공격 상태가 성공으로 끝나는 틱에 경직·대상 놓침 같은 다른 전이가 먼저 걸리면 회복을 거치지 않아 토큰이 남을 수 있다
+	void ReleaseLeftoverTokens(AEnemyAIController* Controller)
+	{
+		if (UCombatTokenSubsystem* Tokens = GetTokens(Controller))
+		{
+			Tokens->ReleaseTokens(Controller->GetPawn(), TEXT("공격하지 않는 상태에서 정리"));
+		}
+	}
+
+	// 패턴 중 가장 싼 토큰 비용. 차례를 받으려면 대상의 남은 토큰이 이 이상이어야 한다 (7-5)
+	int32 GetMinTokenCost(const UEnemyPatternDataAsset& Data)
+	{
+		int32 MinCost = TNumericLimits<int32>::Max();
+		for (const FEnemyAttackPattern& Pattern : Data.Patterns)
+		{
+			if (Pattern.StartAttack)
+			{
+				MinCost = FMath::Min(MinCost, FMath::Max(1, Pattern.TokenCost));
+			}
+		}
+		return MinCost == TNumericLimits<int32>::Max() ? 1 : MinCost;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -102,6 +133,8 @@ EStateTreeRunStatus FStateTreeEnemyApproachTask::EnterState(FStateTreeExecutionC
 	{
 		return EStateTreeRunStatus::Failed;
 	}
+
+	ReleaseLeftoverTokens(Controller);
 
 	const UEnemyPatternDataAsset* Data = Controller->GetPatternData();
 	SetMoveSpeed(Controller, Data->ApproachSpeed);
@@ -150,11 +183,14 @@ EStateTreeRunStatus FStateTreeEnemyStrafeTask::EnterState(FStateTreeExecutionCon
 		return EStateTreeRunStatus::Failed;
 	}
 
+	ReleaseLeftoverTokens(Controller);
+
 	// 방향과 시간은 시작할 때 정하고 끝까지 유지한다 (7-2 질문 3)
 	const UEnemyPatternDataAsset* Data = Controller->GetPatternData();
 	InstanceData.Direction = FMath::RandBool() ? 1.f : -1.f;
 	InstanceData.RemainingTime = FMath::FRandRange(Data->StrafeDurationMin, FMath::Max(Data->StrafeDurationMin, Data->StrafeDurationMax));
 	InstanceData.FlipCooldown = 0.f;
+	InstanceData.WaitTime = -1.f;
 	SetMoveSpeed(Controller, Data->StrafeSpeed);
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 맴돌기 %s, %.1f초 (몸 간격 %.0f)"), *GetNameSafe(Controller->GetPawn()),
@@ -173,14 +209,35 @@ EStateTreeRunStatus FStateTreeEnemyStrafeTask::Tick(FStateTreeExecutionContext& 
 		return EStateTreeRunStatus::Failed;
 	}
 
+	const UEnemyPatternDataAsset* Data = Controller->GetPatternData();
+
+	// 맴돌기 시간이 끝나면 공격 차례를 기다리며 계속 돈다 (7-5). 차례는 토큰 관리자가 정한다(규칙 8)
 	InstanceData.RemainingTime -= DeltaTime;
 	if (InstanceData.RemainingTime <= 0.f)
 	{
-		return EStateTreeRunStatus::Succeeded;
+		UCombatTokenSubsystem* Tokens = GetTokens(Controller);
+		if (!Tokens)
+		{
+			return EStateTreeRunStatus::Succeeded;
+		}
+
+		const int32 MinCost = GetMinTokenCost(*Data);
+		if (Tokens->RequestTurn(Enemy, Target, MinCost))
+		{
+			UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 공격 차례 (대기 %.1f초, 남은 토큰 %d/%d)"), *Enemy->GetName(),
+				FMath::Max(0.f, InstanceData.WaitTime), Tokens->GetFreeTokens(Target), Tokens->GetMaxTokens(Target));
+			return EStateTreeRunStatus::Succeeded;
+		}
+		if (InstanceData.WaitTime < 0.f)
+		{
+			InstanceData.WaitTime = 0.f;
+			UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 공격 차례 대기 (남은 토큰 %d/%d, 필요 %d)"), *Enemy->GetName(),
+				Tokens->GetFreeTokens(Target), Tokens->GetMaxTokens(Target), MinCost);
+		}
+		InstanceData.WaitTime += DeltaTime;
 	}
 	InstanceData.FlipCooldown = FMath::Max(0.f, InstanceData.FlipCooldown - DeltaTime);
 
-	const UEnemyPatternDataAsset* Data = Controller->GetPatternData();
 	const FVector ToTarget = (Target->GetActorLocation() - Enemy->GetActorLocation()).GetSafeNormal2D();
 	if (ToTarget.IsNearlyZero())
 	{
@@ -229,6 +286,10 @@ void FStateTreeEnemyStrafeTask::ExitState(FStateTreeExecutionContext& Context, c
 	if (InstanceData.Controller)
 	{
 		InstanceData.Controller->StopMovement();
+		if (UCombatTokenSubsystem* Tokens = GetTokens(InstanceData.Controller))
+		{
+			Tokens->CancelTurnRequest(InstanceData.Controller->GetPawn());
+		}
 	}
 }
 
@@ -253,7 +314,10 @@ EStateTreeRunStatus FStateTreeEnemySelectPatternTask::EnterState(FStateTreeExecu
 	const AEnemyAIController* Controller = InstanceData.Controller;
 	const UEnemyPatternDataAsset* Data = Controller ? Controller->GetPatternData() : nullptr;
 	const UWorld* World = Controller ? Controller->GetWorld() : nullptr;
-	if (!Data || !World || !Controller->GetCombatTarget())
+	UCombatTokenSubsystem* Tokens = GetTokens(Controller);
+	AActor* Target = Controller ? Controller->GetCombatTarget() : nullptr;
+	APawn* Enemy = Controller ? Controller->GetPawn() : nullptr;
+	if (!Data || !World || !Target || !Enemy || !Tokens)
 	{
 		return EStateTreeRunStatus::Failed;
 	}
@@ -268,10 +332,14 @@ EStateTreeRunStatus FStateTreeEnemySelectPatternTask::EnterState(FStateTreeExecu
 	const double Now = World->GetTimeSeconds();
 	const int32 Num = Data->Patterns.Num();
 
-	TArray<float> WeightScores, DistanceScores, RepeatScores;
+	// 7-5: 남은 토큰으로 살 수 있는 패턴만 (질문 5 B). 아래의 "모두 0이면 빼고 다시 센다"에서도 빼지 않는다
+	const int32 FreeTokens = Tokens->GetFreeTokens(Target);
+
+	TArray<float> WeightScores, DistanceScores, RepeatScores, TokenScores;
 	WeightScores.SetNumZeroed(Num);
 	DistanceScores.SetNumZeroed(Num);
 	RepeatScores.SetNumZeroed(Num);
+	TokenScores.SetNumZeroed(Num);
 	for (int32 Index = 0; Index < Num; ++Index)
 	{
 		const FEnemyAttackPattern& Pattern = Data->Patterns[Index];
@@ -280,6 +348,7 @@ EStateTreeRunStatus FStateTreeEnemySelectPatternTask::EnterState(FStateTreeExecu
 			continue; // 시작 공격이 없는 패턴은 후보에서 뺀다 (가중치 0)
 		}
 		WeightScores[Index] = FMath::Max(0.f, Pattern.Weight);
+		TokenScores[Index] = FMath::Max(1, Pattern.TokenCost) <= FreeTokens ? 1.f : 0.f;
 		DistanceScores[Index] = (Gap >= Pattern.MinGap && Gap <= Pattern.MaxGap) ? 1.f : 0.f;
 
 		const double LastUsed = Controller->GetPatternLastUsedTime(Index);
@@ -291,7 +360,7 @@ EStateTreeRunStatus FStateTreeEnemySelectPatternTask::EnterState(FStateTreeExecu
 	// 점수가 모두 0이면 공격을 거르지 않도록 요소를 하나씩 빼고 다시 센다: 거리 → 반복 방지 순
 	auto ScoreOf = [&](int32 Index, bool bUseDistance, bool bUseRepeat)
 	{
-		return WeightScores[Index] * (bUseDistance ? DistanceScores[Index] : 1.f) * (bUseRepeat ? RepeatScores[Index] : 1.f);
+		return WeightScores[Index] * TokenScores[Index] * (bUseDistance ? DistanceScores[Index] : 1.f) * (bUseRepeat ? RepeatScores[Index] : 1.f);
 	};
 	bool bUseDistance = true;
 	bool bUseRepeat = true;
@@ -321,7 +390,8 @@ EStateTreeRunStatus FStateTreeEnemySelectPatternTask::EnterState(FStateTreeExecu
 	}
 	if (TotalScore <= 0.f)
 	{
-		UE_LOG(LogFirstAction, Warning, TEXT("[%s] AI: 고를 수 있는 패턴이 없음 (시작 공격과 가중치 확인)"), *GetNameSafe(Controller->GetPawn()));
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 고를 수 있는 패턴이 없음 (남은 토큰 %d, 시작 공격·가중치·토큰 비용 확인)"),
+			*GetNameSafe(Controller->GetPawn()), FreeTokens);
 		return EStateTreeRunStatus::Failed;
 	}
 
@@ -347,13 +417,33 @@ EStateTreeRunStatus FStateTreeEnemySelectPatternTask::EnterState(FStateTreeExecu
 	for (int32 Index = 0; Index < Num; ++Index)
 	{
 		const float Score = ScoreOf(Index, bUseDistance, bUseRepeat);
-		Candidates += FString::Printf(TEXT("%s%s %.0f%% (가중치 %.1f × 거리 %.0f × 반복 %.2f)"), Index > 0 ? TEXT(", ") : TEXT(""),
-			*Data->Patterns[Index].Name.ToString(), Score / TotalScore * 100.f, WeightScores[Index], DistanceScores[Index], RepeatScores[Index]);
+		Candidates += FString::Printf(TEXT("%s%s %.0f%% (가중치 %.1f × 거리 %.0f × 반복 %.2f × 토큰 %.0f)"), Index > 0 ? TEXT(", ") : TEXT(""),
+			*Data->Patterns[Index].Name.ToString(), Score / TotalScore * 100.f, WeightScores[Index], DistanceScores[Index], RepeatScores[Index], TokenScores[Index]);
 	}
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 패턴 선택 %s (몸 간격 %.0f%s) 후보: %s"), *GetNameSafe(Controller->GetPawn()),
-		*Data->Patterns[InstanceData.PatternIndex].Name.ToString(), Gap, Fallback, *Candidates);
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 패턴 선택 %s (몸 간격 %.0f, 남은 토큰 %d%s) 후보: %s"), *GetNameSafe(Controller->GetPawn()),
+		*Data->Patterns[InstanceData.PatternIndex].Name.ToString(), Gap, FreeTokens, Fallback, *Candidates);
 
+	// 고른 패턴의 비용만큼 토큰을 쥔다. 회복이 끝날 때까지 들고 간다 (질문 3 B)
+	if (!Tokens->AcquireTokens(Enemy, Target, Data->Patterns[InstanceData.PatternIndex].TokenCost))
+	{
+		InstanceData.PatternIndex = INDEX_NONE;
+		return EStateTreeRunStatus::Failed;
+	}
 	return EStateTreeRunStatus::Running;
+}
+
+void FStateTreeEnemySelectPatternTask::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+{
+	// 공격 상태가 성공으로 끝나면 회복까지 토큰을 들고 간다. 실패하거나 다른 상태로 끊기면 여기서 돌려준다 (7-5)
+	if (Transition.CurrentRunStatus == EStateTreeRunStatus::Succeeded)
+	{
+		return;
+	}
+	const FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+	if (UCombatTokenSubsystem* Tokens = GetTokens(InstanceData.Controller))
+	{
+		Tokens->ReleaseTokens(InstanceData.Controller->GetPawn(), TEXT("공격 상태 끊김"));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -537,6 +627,17 @@ EStateTreeRunStatus FStateTreeEnemyRecoverTask::Tick(FStateTreeExecutionContext&
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 	InstanceData.RemainingTime -= DeltaTime;
 	return InstanceData.RemainingTime <= 0.f ? EStateTreeRunStatus::Succeeded : EStateTreeRunStatus::Running;
+}
+
+void FStateTreeEnemyRecoverTask::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+{
+	// 회복이 끝나면(끊겨도) 토큰을 돌려준다 (7-5 질문 3 B)
+	const FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+	if (UCombatTokenSubsystem* Tokens = GetTokens(InstanceData.Controller))
+	{
+		Tokens->ReleaseTokens(InstanceData.Controller->GetPawn(),
+			Transition.CurrentRunStatus == EStateTreeRunStatus::Succeeded ? TEXT("회복 끝") : TEXT("회복 끊김"));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////

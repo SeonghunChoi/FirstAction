@@ -14,6 +14,11 @@
 //   - 콤보 입력은 구간이 열린 뒤 적마다의 무작위 지연 뒤에 보낸다 (질문 2 B)
 //   - 이어 가는 조건은 적마다: 일반형은 끝까지, 엘리트는 맞거나 막히면 잇고 헛치면 멈춤 (질문 3)
 //   - 패턴 점수 = 가중치 × 거리 × 반복 방지, 점수에 비례해 무작위로 고른다 (질문 4 C, 질문 5 B). 대상 상태 점수는 배포판에서
+//
+// 7-5 결정 (공격 토큰, 관리는 UCombatTokenSubsystem 한 곳, 규칙 8)
+//   - 맴돌기는 시간이 끝나도 차례가 올 때까지 계속 돈다. 차례는 대상에게 가깝고 대상 시선 정면인 적부터 (질문 4 C)
+//   - 패턴 선택이 남은 토큰으로 살 수 있는 패턴만 고르고, 그 비용만큼 토큰을 쥔다 (질문 5 B)
+//   - 회복이 끝나면 돌려준다 (질문 3 B). 공격 상태가 실패하거나 끊겨도 돌려준다. 경직·사망은 관리자가 회수
 
 #pragma once
 
@@ -149,9 +154,13 @@ struct FStateTreeEnemyStrafeTaskInstanceData
 	float Direction = 1.f;
 	float RemainingTime = 0.f;
 	float FlipCooldown = 0.f;
+
+	// 공격 차례를 기다린 시간 (7-5). 음수면 아직 기다리지 않음(맴돌기 시간 중)
+	float WaitTime = -1.f;
 };
 
-// 대상을 바라본 채 맴돌 거리를 유지하며 옆걸음으로 돈다. 시간이 끝나면 성공(7-3: 다음은 공격)
+// 대상을 바라본 채 맴돌 거리를 유지하며 옆걸음으로 돈다. 시간이 끝나면 공격 차례를 기다리며 계속 돌고,
+// 토큰 관리자가 차례를 주면 성공(7-3: 다음은 공격, 7-5: 토큰이 없으면 거리 유지와 측면 이동)
 USTRUCT(meta = (DisplayName = "Enemy Strafe", Category = "Enemy"))
 struct FStateTreeEnemyStrafeTask : public FStateTreeTaskCommonBase
 {
@@ -184,6 +193,8 @@ struct FStateTreeEnemySelectPatternTaskInstanceData
 
 // 유틸리티 점수로 공격 패턴을 고른다 (7-4). 점수 = 가중치 × 거리 × 반복 방지, 점수에 비례해 무작위 (질문 4 C, 질문 5 B)
 // 상태에 들어갈 때 한 번 고르고, 상태가 끝날 때까지 결과를 들고 있는다. 상태 완료에는 관여하지 않는다(같은 상태의 Enemy Attack이 끝내야 끝난다)
+// 7-5: 대상의 남은 토큰으로 살 수 있는 패턴만 후보로 두고, 고른 패턴의 비용만큼 토큰을 쥔다.
+// 상태가 성공으로 끝나면(다음은 회복) 토큰을 들고 가고, 실패하거나 끊기면 돌려준다
 USTRUCT(meta = (DisplayName = "Enemy Select Pattern", Category = "Enemy"))
 struct FStateTreeEnemySelectPatternTask : public FStateTreeTaskCommonBase
 {
@@ -195,6 +206,7 @@ struct FStateTreeEnemySelectPatternTask : public FStateTreeTaskCommonBase
 	virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
 
 	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
 #if WITH_EDITOR
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
@@ -254,6 +266,7 @@ struct FStateTreeEnemyRecoverTaskInstanceData
 };
 
 // 공격 뒤 제자리에서 대상을 바라보며 패턴 데이터의 회복 시간만큼 쉰다
+// 끝나면(끊겨도) 공격 토큰을 돌려준다 (7-5 질문 3 B)
 USTRUCT(meta = (DisplayName = "Enemy Recover", Category = "Enemy"))
 struct FStateTreeEnemyRecoverTask : public FStateTreeTaskCommonBase
 {
@@ -264,6 +277,7 @@ struct FStateTreeEnemyRecoverTask : public FStateTreeTaskCommonBase
 
 	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 	virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
+	virtual void ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
 
 #if WITH_EDITOR
 	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;

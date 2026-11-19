@@ -1,6 +1,6 @@
 // 캐릭터 한 종류의 몸의 성질을 담는 데이터. 플레이어와 적이 같은 형식을 쓴다. (PLAN 4.6, 설계 규칙 6-3)
 // 조작감 값(입력 버퍼, 히트스톱 배율, 대상 원뿔)은 여기가 아니라 캐릭터 블루프린트 기본값에 둔다(6-3 결정).
-// 칸은 쓰는 스텝에서 하나씩 추가한다: 반응 몽타주(6-7), 부위 반응의 부위 본과 회복 시간(6-8).
+// 칸은 쓰는 스텝에서 하나씩 추가한다: 반응 몽타주(6-7), 부위 반응의 부위 본과 회복 시간(6-8), 공격 토큰 수(7-5).
 // 반응 단계 경계값과 부위 반응 임계값·세기는 몸이 아니라 세계 규칙이라 여기 두지 않는다(UCombatSettings, 6-7·6-8 결정).
 
 #pragma once
@@ -23,6 +23,11 @@ public:
 	// 이 값이 정본이다. 캐릭터가 시작할 때 캐릭터 무브먼트의 Mass에 복사한다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Body", meta = (ClampMin = "1.0", Units = "kg"))
 	float Mass = 100.f;
+
+	// 이 캐릭터를 동시에 공격할 수 있는 토큰 수 (7-5 질문 2 A). 공격받는 쪽의 성질
+	// 적은 패턴의 토큰 비용(FEnemyAttackPattern::TokenCost)만큼 이 대상의 토큰을 쥐어야 공격한다. 관리는 UCombatTokenSubsystem
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack Tokens", meta = (ClampMin = "1"))
+	int32 AttackTokens = 1;
 
 	UCombatCharacterData();
 
