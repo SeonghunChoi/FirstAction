@@ -6,6 +6,7 @@ namespace CombatTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_HeavyAttack, "InputTag.HeavyAttack", "강공격 입력");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_Dodge, "InputTag.Dodge", "회피 입력");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_Guard, "InputTag.Guard", "가드 입력 (누르고 있는 동안)");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputTag_Jump, "InputTag.Jump", "점프 입력");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Attacking, "State.Attacking", "공격 어빌리티 실행 중");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dodging, "State.Dodging", "회피 어빌리티 실행 중");
@@ -16,6 +17,7 @@ namespace CombatTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Groggy, "State.Groggy", "경직치 0으로 그로기");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Downed, "State.Downed", "넘어져 누운 구간. 넘어짐 몽타주의 ANS_TagWindow가 붙인다. 이 동안 피격 반응 없음");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Dead, "State.Dead", "사망");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_InAir, "State.InAir", "공중(낙하 이동 모드). 캐릭터가 이동 모드로 붙인다. 공격·회피·가드·점프 불가");
 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Window_Combo, "Window.Combo", "다음 콤보 입력을 소비하는 구간");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Window_Cancel, "Window.Cancel", "회피 등으로 끊을 수 있는 구간");

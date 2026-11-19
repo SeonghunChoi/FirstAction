@@ -118,6 +118,10 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
+	// 공중 규칙 (2026-11-19 결정): 낙하 이동 모드이면 State.InAir를 붙여 공격·회피·가드·점프를 막는다.
+	// 착지해 태그가 떨어지는 순간 버퍼에 남은 입력(공중에서 누른 공격 등)을 다시 시도한다
+	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode = 0) override;
+
 	// 회피 방향 (Step 6-9). 기본은 공격 대상 탐색과 같은 기준: 이동 입력(스틱)이 있으면 그 방향, 없으면 정면 (6-9 결정)
 	// AI(Step 7)는 필요하면 재정의한다
 	virtual FVector GetDodgeDirection() const { return GetAttackTargetDirection(); }
@@ -258,8 +262,8 @@ private:
 	// 공격 콤보는 공격 어빌리티가 Window.Combo에서 꺼내고, 그 밖의 행동(회피 등)은 여기서 살아난다
 	void OnCancelWindowTagChanged(const FGameplayTag Tag, int32 NewCount);
 
-	// 버퍼의 입력과 짝인 어빌리티를 시작해 본다. 하나라도 시작하면 버퍼를 비운다
-	void TryActivateBufferedInput();
+	// 버퍼의 입력과 짝인 어빌리티를 시작해 본다. 하나라도 시작하면 버퍼를 비운다. Reason은 로그용 (캔슬 구간, 착지)
+	void TryActivateBufferedInput(const TCHAR* Reason);
 
 	// 실행 중 상태값: 디버깅용으로 보기만 (설계 규칙 9)
 	UPROPERTY(VisibleInstanceOnly, Category = "Combat|Input")

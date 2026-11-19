@@ -475,11 +475,35 @@ void ACombatCharacterBase::OnCancelWindowTagChanged(const FGameplayTag Tag, int3
 {
 	if (NewCount > 0)
 	{
-		TryActivateBufferedInput();
+		TryActivateBufferedInput(TEXT("캔슬 구간"));
 	}
 }
 
-void ACombatCharacterBase::TryActivateBufferedInput()
+void ACombatCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
+{
+	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
+
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	const bool bInAir = GetCharacterMovement() && GetCharacterMovement()->IsFalling();
+	const bool bWasInAir = AbilitySystemComponent->HasMatchingGameplayTag(CombatTags::State_InAir);
+	if (bInAir == bWasInAir)
+	{
+		return;
+	}
+
+	AbilitySystemComponent->SetLooseGameplayTagCount(CombatTags::State_InAir, bInAir ? 1 : 0);
+	if (!bInAir)
+	{
+		// 착지: 공중에서 막혔던 입력을 다시 시도한다 (캔슬 구간이 열릴 때와 같은 방식)
+		TryActivateBufferedInput(TEXT("착지"));
+	}
+}
+
+void ACombatCharacterBase::TryActivateBufferedInput(const TCHAR* Reason)
 {
 	if (!BufferedInput.InputTag.IsValid() || !GetWorld())
 	{
@@ -509,7 +533,7 @@ void ACombatCharacterBase::TryActivateBufferedInput()
 		if (AbilitySystemComponent->TryActivateAbility(Handle))
 		{
 			BufferedInput = FCombatBufferedInput();
-			UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 버퍼 소비(캔슬 구간): %s (%.2f초 전 입력)"), *GetName(), *InputTag.ToString(), Age);
+			UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 버퍼 소비(%s): %s (%.2f초 전 입력)"), *GetName(), Reason, *InputTag.ToString(), Age);
 			return;
 		}
 	}

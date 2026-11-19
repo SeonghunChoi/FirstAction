@@ -23,6 +23,9 @@ UGA_Guard::UGA_Guard()
 	ActivationBlockedTags.AddTag(CombatTags::State_Staggered);
 	ActivationBlockedTags.AddTag(CombatTags::State_Dead);
 
+	// 공중에서는 가드를 올리지 못한다 (2026-11-19 결정)
+	ActivationBlockedTags.AddTag(CombatTags::State_InAir);
+
 	// 공격·회피·움찔·가드 중이면 그 몽타주의 캔슬 구간에서만 시작한다 (6-9 규칙, 6-10 결정: 가드 연타 방지)
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Attacking);
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Dodging);

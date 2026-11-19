@@ -13,6 +13,7 @@
 #include "FirstAction.h"
 #include "Input/CombatInputConfig.h"
 #include "Combat/LockOnComponent.h"
+#include "Combat/CombatTags.h"
 
 AFirstActionCharacter::AFirstActionCharacter()
 {
@@ -59,9 +60,8 @@ void AFirstActionCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		// FirstAction: 점프는 전투 입력(DA_CombatInputConfig의 IA_Jump → InputTag.Jump)으로 GA_Jump가 받는다.
+		// 템플릿처럼 ACharacter::Jump에 바로 묶으면 공격·경직 중에도 뛰어 전투 규칙을 건너뛴다
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AFirstActionCharacter::Move);
@@ -185,12 +185,11 @@ void AFirstActionCharacter::DoLook(float Yaw, float Pitch)
 
 void AFirstActionCharacter::DoJumpStart()
 {
-	// signal the character to jump
-	Jump();
+	// FirstAction: 입력 태그로 GA_Jump 실행을 요청한다
+	AbilityInputTagPressed(CombatTags::InputTag_Jump);
 }
 
 void AFirstActionCharacter::DoJumpEnd()
 {
-	// signal the character to stop jumping
-	StopJumping();
+	AbilityInputTagReleased(CombatTags::InputTag_Jump);
 }

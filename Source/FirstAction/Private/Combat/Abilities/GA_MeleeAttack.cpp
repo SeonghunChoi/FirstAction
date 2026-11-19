@@ -43,6 +43,9 @@ UGA_MeleeAttack::UGA_MeleeAttack()
 	// 경직(그로기, 넘어짐 포함) 중에는 공격을 시작하지 못한다 (6-7). 움찔(State.Flinching)은 막지 않아 공격으로 끊고 나갈 수 있다
 	ActivationBlockedTags.AddTag(CombatTags::State_Staggered);
 
+	// 공중에서는 시작하지 못한다. 누른 입력은 버퍼에 남았다가 착지하는 순간 다시 시도된다 (2026-11-19 결정)
+	ActivationBlockedTags.AddTag(CombatTags::State_InAir);
+
 	// 회피·가드 중에는 그 몽타주의 캔슬 구간(Window.Cancel)에서만 공격으로 이어 간다 (6-9, 6-11 결정)
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Dodging);
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Guarding);

@@ -20,6 +20,9 @@ UGA_Dodge::UGA_Dodge()
 	ActivationBlockedTags.AddTag(CombatTags::State_Staggered);
 	ActivationBlockedTags.AddTag(CombatTags::State_Dead);
 
+	// 공중에서는 회피하지 못한다. 누른 입력은 착지하는 순간 다시 시도된다 (2026-11-19 결정)
+	ActivationBlockedTags.AddTag(CombatTags::State_InAir);
+
 	// 공격·회피·움찔·가드 중이면 그 몽타주의 캔슬 구간에서만 시작한다 (6-9, 6-11 결정)
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Guarding);
 	CancelWindowRequiredTags.AddTag(CombatTags::State_Attacking);

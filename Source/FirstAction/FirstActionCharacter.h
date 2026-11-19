@@ -41,10 +41,6 @@ class AFirstActionCharacter : public ACombatCharacterBase
 	
 protected:
 
-	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* JumpAction;
-
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MoveAction;
@@ -102,6 +98,7 @@ public:
 	virtual void DoLook(float Yaw, float Pitch);
 
 	/** Handles jump pressed inputs from either controls or UI interfaces */
+	// FirstAction: 점프는 GA_Jump가 한다. 터치 UI 입력도 키 입력과 같은 입력 태그 통로로 보낸다 (규칙 1)
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpStart();
 
