@@ -136,6 +136,11 @@ public:
 	// 입력이 버퍼에 기록된 직후 호출된다
 	FOnCombatInputBuffered OnInputBuffered;
 
+	// 이 캐릭터의 공격이 상대에게 닿은(맞힘, 가드됨) 횟수 (Step 7-4)
+	// 공격 어빌리티가 올리고, 적 AI는 콤보를 이을지(앞 타가 닿았는가) 볼 때 쓴다. 회피·저스트 회피·패리·빗나감은 세지 않는다
+	int32 GetAttackConnectCount() const { return AttackConnectCount; }
+	void NotifyAttackConnected() { ++AttackConnectCount; }
+
 	// 히트스톱: Duration초 동안 이 캐릭터만 CustomTimeDilation을 낮춘다 (Step 6-1)
 	// 애니메이션, 노티파이 구간, 이동이 함께 멈추므로 콤보 타이밍은 어긋나지 않는다.
 	// 이미 멈춰 있으면 남은 시간과 새 시간 중 긴 쪽으로 맞춘다 (한 휘두름에 여러 명을 맞혀도 한 번처럼)
@@ -205,6 +210,10 @@ protected:
 	virtual FVector GetAttackTargetDirection() const;
 
 private:
+	// 공격이 닿은 횟수 (7-4). 변경은 NotifyAttackConnected로만
+	UPROPERTY(VisibleInstanceOnly, Category = "Combat")
+	int32 AttackConnectCount = 0;
+
 	// 맞은 쪽 통로: Event.HitReact의 타격 해석 결과(FHitResolution, 6-4)에서 자기 몫을 꺼내 스스로 적용 (Step 6-1)
 	// 6-7의 GA_HitReact도 같은 이벤트를 받아 반응 몽타주를 재생한다. 히트스톱은 캐릭터, 반응은 어빌리티
 	void HandleHitReactEvent(const FGameplayEventData* Payload);

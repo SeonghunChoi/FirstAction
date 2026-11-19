@@ -416,6 +416,9 @@ void UGA_MeleeAttack::OnHitEvent(FGameplayEventData Payload)
 	{
 		Character->ApplyHitStop(Resolution.AttackerHitStop);
 		Character->ApplyHitDisplacement(-Resolution.Direction, Resolution.AttackerDisplacement, Resolution.MoveDuration);
+
+		// 맞힘이나 가드됨: 공격이 닿았다는 사실만 남긴다 (7-4). 누가 읽는지(적 AI의 콤보 판단)는 모른다
+		Character->NotifyAttackConnected();
 	}
 
 	// 맞은 쪽: 해석 결과 전체를 전용 타깃 데이터로 실어 보낸다 (6-4 결정). 받은 쪽이 자기 몫(히트스톱, 6-5 밀림, 6-7 반응)을 적용한다

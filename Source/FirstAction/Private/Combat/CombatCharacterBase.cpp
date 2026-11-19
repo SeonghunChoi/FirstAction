@@ -167,9 +167,10 @@ void ACombatCharacterBase::AbilityInputTagPressed(FGameplayTag InputTag)
 		BufferInput(InputTag);
 	}
 
+	// 적 AI의 콤보 입력(7-4)은 짝인 어빌리티 없이 버퍼로만 가므로 평소에는 남기지 않는다 (Step 2 진단용)
 	if (!bFound)
 	{
-		UE_LOG(LogFirstAction, Log, TEXT("[%s] 입력 태그 %s에 연결된 어빌리티가 없습니다"), *GetName(), *InputTag.ToString());
+		UE_LOG(LogFirstAction, Verbose, TEXT("[%s] 입력 태그 %s에 연결된 어빌리티가 없습니다"), *GetName(), *InputTag.ToString());
 	}
 }
 

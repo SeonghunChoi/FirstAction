@@ -6,8 +6,14 @@
 //   - 몸 상태는 조건으로 본다: ASC 태그 (질문 1 A). 경직 상태는 State.Staggered / Downed / Groggy 묶음, 움찔 제외 (2/2 질문 1 A)
 //   - 맴돌기는 대상 둘레 옆걸음, 막히기 전에 방향을 바꾼다 (2/2 질문 3 B, 질문 4 C)
 //   - 공격은 걸어 들어가 공격의 MaxWarpDistance 안에서 요청한다. 나머지는 워핑이 메운다 (2/2 질문 5 A)
-//   - 값은 모두 패턴 데이터에서 읽는다 (질문 5 A). 공격 데이터는 7-3에서는 태스크 입력, 7-4에서 패턴 선택 결과를 연결한다
-//   - 규칙 1, 7: 공격 태스크는 공격 요청(Event.AttackRequest)만 보낸다. 실행은 플레이어와 같은 GA_MeleeAttack
+//   - 값은 모두 패턴 데이터에서 읽는다 (질문 5 A)
+//   - 규칙 1, 7: 공격 태스크는 공격 요청(Event.AttackRequest)과 입력 태그만 보낸다. 실행은 플레이어와 같은 GA_MeleeAttack
+//
+// 7-4 결정
+//   - 패턴 = 시작 공격 + 이어 갈 입력 태그 순서. 콤보 분기는 ComboLinks가 정한다 (질문 1 B)
+//   - 콤보 입력은 구간이 열린 뒤 적마다의 무작위 지연 뒤에 보낸다 (질문 2 B)
+//   - 이어 가는 조건은 적마다: 일반형은 끝까지, 엘리트는 맞거나 막히면 잇고 헛치면 멈춤 (질문 3)
+//   - 패턴 점수 = 가중치 × 거리 × 반복 방지, 점수에 비례해 무작위로 고른다 (질문 4 C, 질문 5 B). 대상 상태 점수는 배포판에서
 
 #pragma once
 
@@ -18,7 +24,6 @@
 #include "EnemyStateTreeNodes.generated.h"
 
 class AEnemyAIController;
-class UAttackDataAsset;
 
 ////////////////////////////////////////////////////////////////////
 // 조건
@@ -165,6 +170,38 @@ struct FStateTreeEnemyStrafeTask : public FStateTreeTaskCommonBase
 };
 
 USTRUCT()
+struct FStateTreeEnemySelectPatternTaskInstanceData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = "Context")
+	TObjectPtr<AEnemyAIController> Controller = nullptr;
+
+	// 고른 패턴 번호 (패턴 데이터 Patterns 순서). 같은 상태의 Enemy Attack의 Pattern Index에 바인딩한다
+	UPROPERTY(EditAnywhere, Category = "Output")
+	int32 PatternIndex = INDEX_NONE;
+};
+
+// 유틸리티 점수로 공격 패턴을 고른다 (7-4). 점수 = 가중치 × 거리 × 반복 방지, 점수에 비례해 무작위 (질문 4 C, 질문 5 B)
+// 상태에 들어갈 때 한 번 고르고, 상태가 끝날 때까지 결과를 들고 있는다. 상태 완료에는 관여하지 않는다(같은 상태의 Enemy Attack이 끝내야 끝난다)
+USTRUCT(meta = (DisplayName = "Enemy Select Pattern", Category = "Enemy"))
+struct FStateTreeEnemySelectPatternTask : public FStateTreeTaskCommonBase
+{
+	GENERATED_BODY()
+
+	FStateTreeEnemySelectPatternTask();
+
+	using FInstanceDataType = FStateTreeEnemySelectPatternTaskInstanceData;
+	virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
+
+	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+
+#if WITH_EDITOR
+	virtual FText GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting = EStateTreeNodeFormatting::Text) const override;
+#endif
+};
+
+USTRUCT()
 struct FStateTreeEnemyAttackTaskInstanceData
 {
 	GENERATED_BODY()
@@ -172,16 +209,22 @@ struct FStateTreeEnemyAttackTaskInstanceData
 	UPROPERTY(EditAnywhere, Category = "Context")
 	TObjectPtr<AEnemyAIController> Controller = nullptr;
 
-	// 요청할 공격. 7-3에서는 여기에 직접 지정하고, 7-4에서는 패턴 선택 태스크의 결과를 연결한다
-	// Category "Input"은 StateTree에서 "반드시 바인딩"이라 값을 직접 넣을 수 없다. "Parameter"는 값 지정과 바인딩 둘 다 된다
+	// 실행할 패턴 번호 (패턴 데이터 Patterns 순서). Enemy Select Pattern의 Pattern Index에 바인딩한다 (7-4)
+	// 바인딩하지 않고 값을 넣으면 그 패턴만 쓴다(시험용). Category "Input"은 바인딩 전용이라 "Parameter"로 둔다 (7-3에서 발견)
 	UPROPERTY(EditAnywhere, Category = "Parameter")
-	TObjectPtr<UAttackDataAsset> Attack = nullptr;
+	int32 PatternIndex = 0;
 
-	// 실행 중 상태: 공격을 요청했는가
-	bool bAttackStarted = false;
+	// 실행 중 상태
+	bool bAttackStarted = false;     // 공격을 요청했는가
+	int32 NextComboInput = 0;        // 다음에 보낼 콤보 입력 순서
+	bool bComboWindowOpen = false;   // 지난 틱에 콤보 구간이 열려 있었는가 (구간이 열리는 순간을 알기 위해)
+	float InputDelayRemaining = -1.f; // 콤보 입력까지 남은 지연. 음수면 기다리는 입력 없음
+	int32 ConnectCountAtSwing = 0;   // 이번 휘두름이 시작될 때 공격이 닿은 횟수 (헛침 판단)
+	bool bComboStopped = false;      // 헛치거나 구간을 놓쳐 콤보를 멈췄는가
 };
 
-// 공격 거리(공격의 MaxWarpDistance) 안까지 걸어 들어가 공격을 요청하고, 공격이 끝나면 성공
+// 패턴의 시작 공격 거리(MaxWarpDistance) 안까지 걸어 들어가 공격을 요청하고,
+// 콤보 구간마다 패턴의 입력 태그를 지연 뒤 하나씩 보낸다 (7-4). 공격이 끝나면 성공
 USTRUCT(meta = (DisplayName = "Enemy Attack", Category = "Enemy"))
 struct FStateTreeEnemyAttackTask : public FStateTreeTaskCommonBase
 {

@@ -422,8 +422,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 7-3 (2/2 StateTree): `EnemyStateTreeNodes`(조건 `Enemy Has Tag`/`Enemy Has Target`/`Enemy Target Farther Than`, 태스크 `Enemy Approach`(MoveTo)/`Enemy Strafe`(대상 둘레 옆걸음, 앞을 구로 검사해 막히기 전 방향 전환)/`Enemy Attack`(`MaxWarpDistance` 안까지 걸어 들어가 `RequestAttack`)/`Enemy Recover`), 패턴 데이터 `Engage` 값(`StrafeDistance` 250, `MaxStrafeDistance` 450, 맴돌기 1.5~3초, 속도 180/400, 검사 80, 회복 1초), `AEnemyAIController`에 `UStateTreeAIComponent`(빙의할 때 시작, 시작 실패 경고, 빙의 해제 전에 멈춤), 적 길찾기 이동에 가속도(`bUseAccelerationForPaths`, 애니메이션이 걷기로 바뀜). `Portfolio/AI/ST_Enemy`(Dead, Staggered, Idle, Engage > Approach/Strafe/Attack/Recover), `BP_EnemyAIController`, `Lvl_Training`에 Nav Mesh Bounds Volume. StateTree 노드 칸 Category `Input`은 바인딩 전용이라 값을 넣을 칸은 `Parameter`로. 확인: 다가감 → 맴돌기 → 걸어 들어가 공격 → 회복 반복, 멀어지면 다시 다가감, 더미 앞에서 방향 전환, 경직에서 맴돌기로 복귀, 플레이어 반격에 공격 끊김, 사망 → 래그돌 → 제거 (2026-11-19)
 
+- [x] Step 7-4: `UEnemyPatternDataAsset`에 `Patterns`(`FEnemyAttackPattern`: 시작 공격, 이어 갈 입력 태그 순서, 가중치, 거리 범위, 반복 방지 시간), `ComboInputDelayMin/Max`, `ComboContinueRule`(`Always`/`OnHitOrGuard`). StateTree 태스크 `Enemy Select Pattern`(가중치 × 거리 × 반복 방지 점수에 비례해 무작위, 출력 `PatternIndex`), `Enemy Attack`이 `PatternIndex`를 받아 시작 공격 후 `Window.Combo`마다 지연 뒤 `AbilityInputTagPressed`로 입력. 컨트롤러가 패턴별 마지막 사용 시각, 캐릭터가 `AttackConnectCount`(맞힘·가드됨). `DA_Pattern_Enemy`에 `Light3`/`LightHeavy`/`Heavy`, `ST_Enemy` Attack 상태에 선택 태스크(앞)와 바인딩, `BP_Enemy` `InputBufferDuration` 0.3(0이면 콤보 입력이 버려짐). 확인: 비율 50/33/17%, 반복 점수 하락, 간격 379에서 `Heavy`만 후보, 약-약-약·약-약-강 콤보. 미확인: 엘리트 규칙(`OnHitOrGuard`)은 Step 8-1에서 (2026-11-19)
+
 ### 현재 위치
-- **Step 7-4** 시작 전: `UEnemyPatternDataAsset` 패턴 목록과 패턴 선택 태스크(유틸리티 점수, 결과를 `Enemy Attack`의 `Attack`에 바인딩)
+- **Step 7-5** 시작 전: `UCombatTokenSubsystem`(동시 공격 수 제한, 맴돌기 → 공격 전이에 토큰, 경직되면 토큰 관리자가 태그를 보고 반납)
 - Step 7에서 다시 확인할 것: 6-7 미확인 3가지(누운 구간, 머리 몽타주, 공격 중 움찔), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직 중 회피 금지, 슬로모션 중 히트스톱 겹침(6-13), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 7-1 플레이어 사망, 사망 시 락온 다음 대상(6-14)
 
 ### 결정 기록
@@ -490,6 +492,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-19: 유틸리티 점수 선택은 7-4 패턴 선택 태스크에서만 쓴다. 상태 흐름은 StateTree 전이(7-3)
 - 2026-11-19: 맴돌기는 대상을 바라본 채 `StrafeDistance`를 유지하는 옆걸음, 앞을 검사해 막히기 전에 방향을 바꾼다(7-3)
 - 2026-11-19: 공격은 그 공격의 `MaxWarpDistance` 안까지 걸어 들어간 뒤 요청한다. 나머지는 워핑(7-3)
+- 2026-11-19: 적 공격 패턴 하나 = 시작 공격 + 이어 갈 입력 태그 순서(7-4). 다음 공격은 `ComboLinks`가 정하고, 적은 플레이어와 같은 입력 통로로 태그만 보낸다
+- 2026-11-19: 적 콤보 입력은 구간이 열린 뒤 무작위 지연 뒤에, 지연 범위는 적마다 패턴 데이터(7-4)
+- 2026-11-19: 콤보를 이어 가는 조건은 적마다(7-4). 일반형은 끝까지, 엘리트는 앞 타가 맞거나 막혔을 때만 잇고 헛치면 멈춘다
+- 2026-11-19: 패턴 점수는 가중치 × 거리 × 반복 방지, 점수에 비례해 무작위로 고른다(7-4). 대상 상태 점수는 배포 빌드에서
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

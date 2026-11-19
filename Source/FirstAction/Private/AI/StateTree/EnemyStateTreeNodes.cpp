@@ -233,27 +233,223 @@ void FStateTreeEnemyStrafeTask::ExitState(FStateTreeExecutionContext& Context, c
 }
 
 ////////////////////////////////////////////////////////////////////
+// Select Pattern (7-4)
+
+FStateTreeEnemySelectPatternTask::FStateTreeEnemySelectPatternTask()
+{
+	// 들어갈 때 한 번 고르고 결과만 들고 있는다. 매 틱 할 일이 없고, 상태 완료는 같은 상태의 Enemy Attack이 정한다
+	bShouldCallTick = false;
+#if WITH_EDITORONLY_DATA
+	bConsideredForCompletion = false;
+	bCanEditConsideredForCompletion = false;
+#endif
+}
+
+EStateTreeRunStatus FStateTreeEnemySelectPatternTask::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+{
+	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+	InstanceData.PatternIndex = INDEX_NONE;
+
+	const AEnemyAIController* Controller = InstanceData.Controller;
+	const UEnemyPatternDataAsset* Data = Controller ? Controller->GetPatternData() : nullptr;
+	const UWorld* World = Controller ? Controller->GetWorld() : nullptr;
+	if (!Data || !World || !Controller->GetCombatTarget())
+	{
+		return EStateTreeRunStatus::Failed;
+	}
+	if (Data->Patterns.IsEmpty())
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] AI: 패턴 데이터 %s에 패턴이 없음"), *GetNameSafe(Controller->GetPawn()), *GetNameSafe(Data));
+		return EStateTreeRunStatus::Failed;
+	}
+
+	// 유틸리티 점수 (질문 4 C): 가중치 × 거리 × 반복 방지. 각 요소는 0~1(가중치만 크기)
+	const float Gap = Controller->GetTargetGap();
+	const double Now = World->GetTimeSeconds();
+	const int32 Num = Data->Patterns.Num();
+
+	TArray<float> WeightScores, DistanceScores, RepeatScores;
+	WeightScores.SetNumZeroed(Num);
+	DistanceScores.SetNumZeroed(Num);
+	RepeatScores.SetNumZeroed(Num);
+	for (int32 Index = 0; Index < Num; ++Index)
+	{
+		const FEnemyAttackPattern& Pattern = Data->Patterns[Index];
+		if (!Pattern.StartAttack)
+		{
+			continue; // 시작 공격이 없는 패턴은 후보에서 뺀다 (가중치 0)
+		}
+		WeightScores[Index] = FMath::Max(0.f, Pattern.Weight);
+		DistanceScores[Index] = (Gap >= Pattern.MinGap && Gap <= Pattern.MaxGap) ? 1.f : 0.f;
+
+		const double LastUsed = Controller->GetPatternLastUsedTime(Index);
+		RepeatScores[Index] = (LastUsed < 0.0 || Pattern.RepeatCooldown <= 0.f)
+			? 1.f
+			: FMath::Clamp(static_cast<float>((Now - LastUsed) / Pattern.RepeatCooldown), 0.f, 1.f);
+	}
+
+	// 점수가 모두 0이면 공격을 거르지 않도록 요소를 하나씩 빼고 다시 센다: 거리 → 반복 방지 순
+	auto ScoreOf = [&](int32 Index, bool bUseDistance, bool bUseRepeat)
+	{
+		return WeightScores[Index] * (bUseDistance ? DistanceScores[Index] : 1.f) * (bUseRepeat ? RepeatScores[Index] : 1.f);
+	};
+	bool bUseDistance = true;
+	bool bUseRepeat = true;
+	auto Total = [&]()
+	{
+		float Sum = 0.f;
+		for (int32 Index = 0; Index < Num; ++Index)
+		{
+			Sum += ScoreOf(Index, bUseDistance, bUseRepeat);
+		}
+		return Sum;
+	};
+
+	float TotalScore = Total();
+	const TCHAR* Fallback = TEXT("");
+	if (TotalScore <= 0.f)
+	{
+		bUseDistance = false;
+		TotalScore = Total();
+		Fallback = TEXT(", 거리에 맞는 패턴 없음 → 거리 무시");
+	}
+	if (TotalScore <= 0.f)
+	{
+		bUseRepeat = false;
+		TotalScore = Total();
+		Fallback = TEXT(", 모두 반복 방지 중 → 가중치만");
+	}
+	if (TotalScore <= 0.f)
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] AI: 고를 수 있는 패턴이 없음 (시작 공격과 가중치 확인)"), *GetNameSafe(Controller->GetPawn()));
+		return EStateTreeRunStatus::Failed;
+	}
+
+	// 점수에 비례해 무작위 (질문 5 B)
+	float Pick = FMath::FRandRange(0.f, TotalScore);
+	for (int32 Index = 0; Index < Num; ++Index)
+	{
+		const float Score = ScoreOf(Index, bUseDistance, bUseRepeat);
+		if (Score <= 0.f)
+		{
+			continue;
+		}
+		InstanceData.PatternIndex = Index;
+		Pick -= Score;
+		if (Pick <= 0.f)
+		{
+			break;
+		}
+	}
+
+	// 로그: 고른 패턴과 후보별 점수(확률)
+	FString Candidates;
+	for (int32 Index = 0; Index < Num; ++Index)
+	{
+		const float Score = ScoreOf(Index, bUseDistance, bUseRepeat);
+		Candidates += FString::Printf(TEXT("%s%s %.0f%% (가중치 %.1f × 거리 %.0f × 반복 %.2f)"), Index > 0 ? TEXT(", ") : TEXT(""),
+			*Data->Patterns[Index].Name.ToString(), Score / TotalScore * 100.f, WeightScores[Index], DistanceScores[Index], RepeatScores[Index]);
+	}
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 패턴 선택 %s (몸 간격 %.0f%s) 후보: %s"), *GetNameSafe(Controller->GetPawn()),
+		*Data->Patterns[InstanceData.PatternIndex].Name.ToString(), Gap, Fallback, *Candidates);
+
+	return EStateTreeRunStatus::Running;
+}
+
+////////////////////////////////////////////////////////////////////
 // Attack
+
+namespace
+{
+	const FEnemyAttackPattern* GetPattern(const AEnemyAIController* Controller, int32 PatternIndex)
+	{
+		const UEnemyPatternDataAsset* Data = Controller ? Controller->GetPatternData() : nullptr;
+		return Data && Data->Patterns.IsValidIndex(PatternIndex) ? &Data->Patterns[PatternIndex] : nullptr;
+	}
+
+	// 콤보 입력 (7-4). 콤보 구간이 열리는 순간 이어 갈지 정하고, 지연 뒤 입력 태그를 하나 보낸다
+	void UpdateComboInput(FStateTreeEnemyAttackTaskInstanceData& InstanceData, const FEnemyAttackPattern& Pattern,
+		const UEnemyPatternDataAsset& Data, AEnemyCharacter& Enemy, const UAbilitySystemComponent& ASC, float DeltaTime)
+	{
+		if (InstanceData.bComboStopped || InstanceData.NextComboInput >= Pattern.ComboInputs.Num())
+		{
+			return;
+		}
+
+		const bool bWindowOpen = ASC.HasMatchingGameplayTag(CombatTags::Window_Combo);
+		const FGameplayTag& InputTag = Pattern.ComboInputs[InstanceData.NextComboInput];
+
+		// 구간이 열리는 순간: 이어 갈지 보고(질문 3), 이어 가면 지연을 고른다(질문 2 B)
+		if (bWindowOpen && !InstanceData.bComboWindowOpen)
+		{
+			const bool bConnected = Enemy.GetAttackConnectCount() > InstanceData.ConnectCountAtSwing;
+			if (Data.ComboContinueRule == EEnemyComboContinueRule::OnHitOrGuard && !bConnected)
+			{
+				InstanceData.bComboStopped = true;
+				UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 콤보 멈춤 (헛침, %s 보내지 않음)"), *Enemy.GetName(), *InputTag.ToString());
+			}
+			else
+			{
+				InstanceData.InputDelayRemaining = FMath::FRandRange(Data.ComboInputDelayMin, FMath::Max(Data.ComboInputDelayMin, Data.ComboInputDelayMax));
+			}
+		}
+
+		if (bWindowOpen && InstanceData.InputDelayRemaining >= 0.f)
+		{
+			// 히트스톱·슬로모션 중에는 몽타주(구간)도 느려지므로 지연도 같은 배율로 센다
+			InstanceData.InputDelayRemaining -= DeltaTime * Enemy.CustomTimeDilation;
+			if (InstanceData.InputDelayRemaining <= 0.f)
+			{
+				InstanceData.InputDelayRemaining = -1.f;
+				InstanceData.ConnectCountAtSwing = Enemy.GetAttackConnectCount();
+				++InstanceData.NextComboInput;
+				UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 콤보 입력 %s (%d/%d)"), *Enemy.GetName(), *InputTag.ToString(),
+					InstanceData.NextComboInput, Pattern.ComboInputs.Num());
+
+				// 플레이어 버튼과 같은 통로: 눌렀다 뗀다 (규칙 1). 다음 공격은 GA_MeleeAttack이 ComboLinks로 고른다
+				Enemy.AbilityInputTagPressed(InputTag);
+				Enemy.AbilityInputTagReleased(InputTag);
+			}
+		}
+		else if (!bWindowOpen && InstanceData.bComboWindowOpen && InstanceData.InputDelayRemaining >= 0.f)
+		{
+			// 지연보다 구간이 먼저 닫혔다: 콤보를 놓친다
+			InstanceData.InputDelayRemaining = -1.f;
+			InstanceData.bComboStopped = true;
+			UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 콤보 입력 놓침 (지연보다 구간이 먼저 닫힘, %s)"), *Enemy.GetName(), *InputTag.ToString());
+		}
+
+		InstanceData.bComboWindowOpen = bWindowOpen;
+	}
+}
 
 EStateTreeRunStatus FStateTreeEnemyAttackTask::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 	AEnemyAIController* Controller = InstanceData.Controller;
 	InstanceData.bAttackStarted = false;
+	InstanceData.NextComboInput = 0;
+	InstanceData.bComboWindowOpen = false;
+	InstanceData.InputDelayRemaining = -1.f;
+	InstanceData.ConnectCountAtSwing = 0;
+	InstanceData.bComboStopped = false;
 
 	if (!Controller || !Controller->GetCombatTarget() || !GetEnemy(Controller))
 	{
 		return EStateTreeRunStatus::Failed;
 	}
-	if (!InstanceData.Attack)
+
+	const FEnemyAttackPattern* Pattern = GetPattern(Controller, InstanceData.PatternIndex);
+	if (!Pattern || !Pattern->StartAttack)
 	{
-		UE_LOG(LogFirstAction, Warning, TEXT("[%s] AI: Enemy Attack 태스크에 Attack이 없음"), *GetNameSafe(Controller->GetPawn()));
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] AI: Enemy Attack의 패턴 %d이 없거나 시작 공격이 비어 있음"),
+			*GetNameSafe(Controller->GetPawn()), InstanceData.PatternIndex);
 		return EStateTreeRunStatus::Failed;
 	}
 
 	SetMoveSpeed(Controller, Controller->GetPatternData()->ApproachSpeed);
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 공격하러 들어감 %s (몸 간격 %.0f → 공격 거리 %.0f)"), *GetNameSafe(Controller->GetPawn()),
-		*InstanceData.Attack->GetName(), Controller->GetTargetGap(), InstanceData.Attack->MaxWarpDistance);
+		*Pattern->Name.ToString(), Controller->GetTargetGap(), Pattern->StartAttack->MaxWarpDistance);
 	return EStateTreeRunStatus::Running;
 }
 
@@ -263,15 +459,21 @@ EStateTreeRunStatus FStateTreeEnemyAttackTask::Tick(FStateTreeExecutionContext& 
 	AEnemyAIController* Controller = InstanceData.Controller;
 	AEnemyCharacter* Enemy = GetEnemy(Controller);
 	UAbilitySystemComponent* ASC = GetEnemyASC(Controller);
-	if (!Enemy || !ASC || !InstanceData.Attack)
+	const FEnemyAttackPattern* Pattern = GetPattern(Controller, InstanceData.PatternIndex);
+	if (!Enemy || !ASC || !Pattern || !Pattern->StartAttack)
 	{
 		return EStateTreeRunStatus::Failed;
 	}
 
-	// 공격 중: State.Attacking이 떨어지면(콤보 없이 한 번) 끝
+	// 공격 중: 콤보 입력을 보내고, State.Attacking이 떨어지면(콤보 전체가 끝나면) 성공
 	if (InstanceData.bAttackStarted)
 	{
-		return ASC->HasMatchingGameplayTag(CombatTags::State_Attacking) ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Succeeded;
+		if (!ASC->HasMatchingGameplayTag(CombatTags::State_Attacking))
+		{
+			return EStateTreeRunStatus::Succeeded;
+		}
+		UpdateComboInput(InstanceData, *Pattern, *Controller->GetPatternData(), *Enemy, *ASC, DeltaTime);
+		return EStateTreeRunStatus::Running;
 	}
 
 	if (!Controller->GetCombatTarget())
@@ -279,8 +481,8 @@ EStateTreeRunStatus FStateTreeEnemyAttackTask::Tick(FStateTreeExecutionContext& 
 		return EStateTreeRunStatus::Failed;
 	}
 
-	// 공격 거리 밖: 걸어 들어간다 (질문 5 A). 공격 거리 = 그 공격의 워핑 최대 거리, 나머지는 워핑이 메운다
-	const float Reach = InstanceData.Attack->MaxWarpDistance;
+	// 공격 거리 밖: 걸어 들어간다 (7-3 질문 5 A). 공격 거리 = 시작 공격의 워핑 최대 거리, 나머지는 워핑이 메운다
+	const float Reach = Pattern->StartAttack->MaxWarpDistance;
 	if (Controller->GetTargetGap() > Reach)
 	{
 		return MoveTowardTarget(Controller, Reach) ? EStateTreeRunStatus::Running : EStateTreeRunStatus::Failed;
@@ -288,15 +490,18 @@ EStateTreeRunStatus FStateTreeEnemyAttackTask::Tick(FStateTreeExecutionContext& 
 
 	// 공격 거리 안: 멈추고 요청만 보낸다 (규칙 1, 7). 막혀 있으면(경직 등) 어빌리티가 시작되지 않는다
 	Controller->StopMovement();
-	Enemy->RequestAttack(InstanceData.Attack);
+	Enemy->RequestAttack(Pattern->StartAttack);
 	if (!ASC->HasMatchingGameplayTag(CombatTags::State_Attacking))
 	{
-		UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 공격 요청이 시작되지 않음 %s"), *Enemy->GetName(), *InstanceData.Attack->GetName());
+		UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 공격 요청이 시작되지 않음 %s"), *Enemy->GetName(), *Pattern->StartAttack->GetName());
 		return EStateTreeRunStatus::Failed;
 	}
 
 	InstanceData.bAttackStarted = true;
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 공격 요청 %s (몸 간격 %.0f)"), *Enemy->GetName(), *InstanceData.Attack->GetName(), Controller->GetTargetGap());
+	InstanceData.ConnectCountAtSwing = Enemy->GetAttackConnectCount();
+	Controller->MarkPatternUsed(InstanceData.PatternIndex);
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] AI: 공격 요청 %s: %s + 입력 %d개 (몸 간격 %.0f)"), *Enemy->GetName(), *Pattern->Name.ToString(),
+		*Pattern->StartAttack->GetName(), Pattern->ComboInputs.Num(), Controller->GetTargetGap());
 	return EStateTreeRunStatus::Running;
 }
 
@@ -366,10 +571,14 @@ FText FStateTreeEnemyStrafeTask::GetDescription(const FGuid& ID, FStateTreeDataV
 	return FText::FromString(TEXT("Strafe Around Target"));
 }
 
+FText FStateTreeEnemySelectPatternTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting) const
+{
+	return FText::FromString(TEXT("Select Pattern (Utility)"));
+}
+
 FText FStateTreeEnemyAttackTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting) const
 {
-	const FInstanceDataType* InstanceData = InstanceDataView.GetPtr<FInstanceDataType>();
-	return FText::FromString(FString::Printf(TEXT("Attack: %s"), InstanceData && InstanceData->Attack ? *InstanceData->Attack->GetName() : TEXT("(none)")));
+	return FText::FromString(TEXT("Attack With Pattern"));
 }
 
 FText FStateTreeEnemyRecoverTask::GetDescription(const FGuid& ID, FStateTreeDataView InstanceDataView, const IStateTreeBindingLookup& BindingLookup, EStateTreeNodeFormatting Formatting) const

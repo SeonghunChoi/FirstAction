@@ -61,6 +61,20 @@ AEnemyAIController::AEnemyAIController(const FObjectInitializer& ObjectInitializ
 	SetPerceptionComponent(*Perception);
 }
 
+double AEnemyAIController::GetPatternLastUsedTime(int32 PatternIndex) const
+{
+	const double* Time = PatternLastUsedTimes.Find(PatternIndex);
+	return Time ? *Time : -1.0;
+}
+
+void AEnemyAIController::MarkPatternUsed(int32 PatternIndex)
+{
+	if (const UWorld* World = GetWorld())
+	{
+		PatternLastUsedTimes.Add(PatternIndex, World->GetTimeSeconds());
+	}
+}
+
 void AEnemyAIController::OnPossess(APawn* InPawn)
 {
 	// Super 안에서 폰의 PossessedBy가 이 컨트롤러에 팀을 넘긴다 (7-1)

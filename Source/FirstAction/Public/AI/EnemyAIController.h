@@ -47,6 +47,10 @@ public:
 	// 폰의 패턴 데이터. 지정하지 않았으면 클래스 기본값
 	const UEnemyPatternDataAsset* GetPatternData() const;
 
+	// 패턴 반복 방지 기록 (7-4). 패턴 번호(패턴 데이터 Patterns 순서)별로 마지막으로 쓴 게임 시간. 쓴 적이 없으면 음수
+	double GetPatternLastUsedTime(int32 PatternIndex) const;
+	void MarkPatternUsed(int32 PatternIndex);
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
@@ -94,4 +98,7 @@ private:
 
 	// 마지막으로 안 위치: 마지막으로 본 위치, 또는 가까이서 마지막으로 안 위치. 반응 대기 중과 멀어진 뒤 이곳을 본다
 	FVector LastKnownLocation = FVector::ZeroVector;
+
+	// 패턴 번호 → 마지막으로 쓴 게임 시간 (반복 방지 점수, 7-4)
+	TMap<int32, double> PatternLastUsedTimes;
 };
