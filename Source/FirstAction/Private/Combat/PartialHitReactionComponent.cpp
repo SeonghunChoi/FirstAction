@@ -47,6 +47,13 @@ void UPartialHitReactionComponent::BeginPlay()
 
 	PhysicalAnimation->SetSkeletalMeshComponent(Mesh);
 
+	// 물리 애니메이션 갱신은 이 컴포넌트의 틱에서 직접 부른다 (8-2 중 크래시 수정).
+	// 엔진 틱(UpdateTargetActors)은 메시의 뼈 변환 배열을 검사 없이 읽는데, 그 배열이 비어 있는 프레임에
+	// "Array index out of bounds: 11 into an array of size 0"(본 11 = upperarm_l)로 크래시가 났다.
+	// 순서는 엔진과 같게 메시 틱 뒤로 둔다
+	PhysicalAnimation->SetComponentTickEnabled(false);
+	AddTickPrerequisiteComponent(Mesh);
+
 	// 상체(spine_01 아래)가 물리로 돌 때 메시 컴포넌트가 바디를 따라가면, 월드 기준 목표 자세도 같이 움직여 돌아오지 않는다 (FirstVR)
 	Mesh->PhysicsTransformUpdateMode = EPhysicsTransformUpdateMode::ComponentTransformIsKinematic;
 
@@ -146,6 +153,17 @@ void UPartialHitReactionComponent::StartRagdoll()
 void UPartialHitReactionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// 물리 바디를 애니메이션 자세로 당기는 목표를 갱신한다. 뼈 변환 배열이 다 차 있을 때만 (BeginPlay 설명)
+	if (Mesh->GetEditableComponentSpaceTransforms().Num() == Mesh->GetNumBones())
+	{
+		PhysicalAnimation->TickComponent(DeltaTime, TickType, nullptr);
+	}
+	else
+	{
+		UE_LOG(LogFirstAction, Warning, TEXT("[%s] 부위 반응: 메시 뼈 변환이 비어 있어 이번 프레임 물리 애니메이션 갱신을 건너뜀 (%d / %d)"),
+			*GetNameSafe(GetOwner()), Mesh->GetEditableComponentSpaceTransforms().Num(), Mesh->GetNumBones());
+	}
 
 	// 회복 시간은 몸마다 (6-8 결정). 히트스톱 중에는 DeltaTime이 줄어 회복도 늦춰진다
 	const ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(GetOwner());
