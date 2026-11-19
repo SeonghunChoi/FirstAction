@@ -75,4 +75,14 @@ public:
 	// 몽타주의 Window.Combo 구간에서 목록의 입력이 들어오면 그 다음 공격으로 넘어간다. 비어 있으면 콤보 끝
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combo", meta = (TitleProperty = "InputTag"))
 	TArray<FAttackComboLink> ComboLinks;
+
+	// 이 입력으로 이어지는 다음 공격. 링크가 없으면 nullptr
+	const UAttackDataAsset* FindNextAttack(const FGameplayTag& InputTag) const;
+
+#if WITH_EDITOR
+	// 데이터 검증 (Step 8-3). 저장할 때와 일괄 검사 때 엔진이 부른다
+	// 오류: 몽타주 없음, 링크의 입력 태그·다음 공격 없음, 같은 입력 링크 중복, 링크가 있는데 Window.Combo 구간 없음
+	// 경고: 판정 구간 없음, 워핑 거리가 있는데 워핑 구간이 없거나 목표 이름이 다름, 링크가 자기 자신으로 돌아오는 순환
+	virtual EDataValidationResult IsDataValid(class FDataValidationContext& Context) const override;
+#endif
 };

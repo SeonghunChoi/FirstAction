@@ -167,6 +167,7 @@ Source/FirstAction/
 │   │   ├── CombatCharacterData.h      // 몸의 성질: 질량(6-3), 반응 몽타주(6-7), 부위 대표 본과 회복 시간(6-8)
 │   │   ├── HitReactionTypes.h         // 반응 단계 열거형 (움찔/경직/넘어짐/그로기)
 │   │   ├── AttackDataAsset.h
+│   │   ├── CombatDataValidation.h     // 데이터 검증(IsDataValid)이 함께 쓰는 몽타주 검사 함수, 에디터 전용 (8-3)
 │   │   ├── HitResolveSubsystem.h      // FHitResolution, 간격 분배, 상대 충격량, 전달용 타깃 데이터
 │   │   ├── CombatSettings.h           // 프로젝트 설정 "Combat": 세계 규칙 계수 (밀림, 경직치, 반응 단계 경계, 부위 반응)
 │   │   ├── PartialHitReactionComponent.h // 맞은 본 아래 물리 반응
@@ -435,8 +436,11 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 8-2: 약1의 강 분기를 새 기술로 교체(C++ 0줄). `A_UAL1_Sword_Attack`(`RTG_UAL1_Manny`), `AM_UAL1_Sword_Attack`(워핑, 판정, `Window.Cancel`), `DA_Attack_LightHeavy`(피해 12, 충격 48000, 간격 60, 히트스톱 0.08, 끝 노드), `DA_Attack_Light_01`의 강 링크만 교체. 경직이 보이지 않아 경직 전용 몽타주 `AM_UAL1_Hit_Chest_Stagger`/`_Head_Stagger`(Rate Scale 0.5)를 만들어 모든 캐릭터 데이터의 경직 칸에 지정(경직 0.15 → 약 0.5초). 엘리트 질량 200 → 180kg. 절차 문서 `Docs/AddingAnAttack.md`. 확인: 약-강/약-약-강 분기, 일반 적 600 경직·경직치 42, 엘리트 267 경직·약공격 133 움찔, 엘리트 그로기, 패리 반동 267 (2026-11-20)
 - [x] Step 8-2 중 크래시 수정: 락온한 채 같은 적에게 약-강을 거듭 넣다 엔진 `UPhysicalAnimationComponent::UpdateTargetActors`가 빈 뼈 배열을 읽어 크래시(본 11 = `upperarm_l`, 0개 배열). `UPartialHitReactionComponent`가 물리 애니메이션 자체 틱을 끄고 자기 틱(메시 틱 뒤)에서 뼈 배열이 다 찼을 때만 `TickComponent`를 부른다(비면 경고 로그). 확인: 크래시 재현 없음, 맞은 다음 프레임에 빈 배열(0/89) 1회를 건너뜀 (2026-11-20)
 
+- [x] Step 8-3: 데이터 검증. `UAttackDataAsset`·`UCombatCharacterData`·`UEnemyPatternDataAsset::IsDataValid`(에디터 전용), 공통 몽타주 검사 `CombatDataValidation`(노티파이 스테이트, `ANS_TagWindow` 태그, 워핑 목표 이름), `UAttackDataAsset::FindNextAttack`, `UGA_MeleeAttack::GetWarpTargetName`. 오류: 몽타주 없음, 링크 입력·다음 공격 없음·중복, 링크가 있는데 `Window.Combo` 없음, 질량 0 이하, 토큰 1 미만, 범위 뒤집힘, 패턴 시작 공격 없음, 패턴 입력 순서가 링크로 이어지지 않음. 경고: 판정·워핑 구간 없음, 워핑 목표 이름 다름, 순환 링크, 반응·회피·가드·사망 몽타주 빈칸, 넘어짐 `State.Downed`·회피 `State.Invulnerable` 없음, 패턴 없음·이름·가중치. 확인: `Portfolio/Data` 18개 오류 0·경고 3(더미 세 종 사망 몽타주 없음, 의도), 패턴 입력을 일부러 바꿔 경로까지 짚는 오류 확인 후 되돌림. `Lvl_TestEnemies`는 사용자 의도로 엘리트 1체 구성 (2026-11-20)
+- [x] ✅ Step 8 마일스톤: 엘리트 적(8-1)과 플레이어 새 공격(8-2) 모두 C++ 변경 0줄. 같은 스텝의 C++ 수정(점프, 크래시, 검증)은 콘텐츠 추가와 무관한 버그 수정·도구 (2026-11-20)
+
 ### 현재 위치
-- **Step 8-3** 시작 전: 데이터 검증 (`IsDataValid`): 몽타주 누락, 판정 구간 없는 공격 등
+- **Step 9-1** 시작 전: `UCombatContentSet`, `UPortfolioContentSettings`, 폴백
 - 알려진 현상: 점프 중에 맞으면 공중에서 경직 몽타주가 재생된다(공중 피격 반응은 따로 없음). 배포 빌드 후보
 - Step 7 마무리 점검에서 확인됨 (2026-11-19): 머리 몽타주(`AM_UAL1_Hit_Head`, 맞은 본 head), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직·그로기 중 회피 금지(입력은 버퍼로만), 슬로모션 중 히트스톱 겹침(6-13, 히트스톱 뒤 슬로모션 유지. 슬로모션 1.5초가 짧게 느껴짐 → 배포 빌드 튜닝 후보)
 - Step 8에서 다시 확인할 것 (Step 7 마무리에서 사용자 판단으로 이월, 적 2체로 시험하면 쉬움): 누운 구간 반응 없음(6-7), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
@@ -523,6 +527,8 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-20: 약-강 클립은 UAL1 `Sword_Attack`, 성격은 경직치 깎기(충격 48000, 간격 60, 끝 노드)(8-2)
 - 2026-11-20: 경직은 움찔과 같은 클립을 `Rate Scale` 0.5로 재생하는 전용 몽타주(`_Stagger`)로 구분한다(8-2 중 발견). 캐릭터 데이터의 경직 칸만 바꾼다
 - 2026-11-20: 물리 애니메이션 갱신은 부위 반응 컴포넌트가 메시 뼈 배열을 확인한 뒤 직접 부른다(8-2 중 크래시 수정)
+- 2026-11-20: 데이터 검증은 데이터 사이의 연결까지 본다(8-3). 패턴 입력 순서를 시작 공격부터 `ComboLinks`로 따라가 끊기면 오류. 공격 데이터를 고친 뒤에는 일괄 검사로 패턴까지 본다
+- 2026-11-20: 검증 등급은 깨지는 것만 오류, 일부러 그랬을 수 있는 것은 경고(8-3)
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

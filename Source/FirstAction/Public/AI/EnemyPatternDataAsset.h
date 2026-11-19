@@ -140,4 +140,13 @@ public:
 	// 콤보를 이어 가는 조건 (7-4 질문 3). 일반형 Always, 엘리트 OnHitOrGuard
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Pattern")
 	EEnemyComboContinueRule ComboContinueRule = EEnemyComboContinueRule::Always;
+
+#if WITH_EDITOR
+	// 데이터 검증 (Step 8-3, 질문 1 C: 데이터 사이의 연결까지)
+	// 오류: 범위 뒤집힘(시야, 맴돌기 거리·시간, 콤보 지연, 패턴 거리), 시작 공격 없음,
+	//       이어 갈 입력 순서가 시작 공격부터 ComboLinks로 이어지지 않음
+	// 경고: 패턴 없음, 이름 없음·중복, 가중치 0 이하(고를 수 없음)
+	// 공격 데이터의 링크를 고친 뒤에는 이 데이터가 다시 검사되지 않는다. 일괄 검사로 함께 본다
+	virtual EDataValidationResult IsDataValid(class FDataValidationContext& Context) const override;
+#endif
 };

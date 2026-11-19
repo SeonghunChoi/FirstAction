@@ -47,6 +47,14 @@ public:
 
 	UAnimMontage* GetDeathMontage() const { return DeathMontage; }
 
+#if WITH_EDITOR
+	// 데이터 검증 (Step 8-3)
+	// 오류: 질량 0 이하, 공격 토큰 1 미만
+	// 경고: 반응(움찔·경직·넘어짐·그로기)·회피·가드·사망 몽타주 없음, 넘어짐 몽타주에 State.Downed 구간 없음,
+	//       회피 몽타주에 State.Invulnerable 구간 없음, 부위 대표 본 없음
+	virtual EDataValidationResult IsDataValid(class FDataValidationContext& Context) const override;
+#endif
+
 protected:
 	// 회피 몽타주 (6-9). 앞으로 구르는 루트 모션 하나를 회피 방향으로 몸을 돌려 쓴다
 	// 무적 구간(State.Invulnerable)과 캔슬 구간(Window.Cancel)은 이 몽타주의 ANS_TagWindow가 정한다

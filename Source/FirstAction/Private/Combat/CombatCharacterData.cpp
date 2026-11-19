@@ -3,6 +3,12 @@
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 
+#if WITH_EDITOR
+#include "Combat/CombatDataValidation.h"
+#include "Combat/CombatTags.h"
+#include "Misc/DataValidation.h"
+#endif
+
 UCombatCharacterData::UCombatCharacterData()
 {
 	// 마네킹 기준 부위 대표 본. 새로 만든 데이터 에셋과 이 칸을 저장한 적 없는 기존 에셋은 이 값을 쓴다
@@ -53,3 +59,64 @@ UAnimMontage* UCombatCharacterData::FindReactionMontage(EHitReactionStage Stage,
 		return nullptr;
 	}
 }
+
+#if WITH_EDITOR
+EDataValidationResult UCombatCharacterData::IsDataValid(FDataValidationContext& Context) const
+{
+	EDataValidationResult Result = CombineDataValidationResults(Super::IsDataValid(Context), EDataValidationResult::Valid);
+	const FString P = CombatDataValidation::Prefix(this);
+
+	auto Error = [&](const FString& Message)
+	{
+		Context.AddError(FText::FromString(P + Message));
+		Result = EDataValidationResult::Invalid;
+	};
+	auto Warning = [&](const FString& Message)
+	{
+		Context.AddWarning(FText::FromString(P + Message));
+	};
+
+	if (Mass <= 0.f)
+	{
+		Error(FString::Printf(TEXT("질량(Mass)이 %.1fkg입니다. 상대 충격량을 계산할 수 없습니다"), Mass));
+	}
+	if (AttackTokens < 1)
+	{
+		Error(FString::Printf(TEXT("공격 토큰(AttackTokens)이 %d개라 이 캐릭터를 아무도 공격할 수 없습니다"), AttackTokens));
+	}
+
+	// 비어 있으면 그 반응·행동이 일어나지 않는다. 반응하지 않는 몸일 수 있으므로 경고 (8-3 결정 B)
+	// 머리 몽타주는 비면 몸통 몽타주를 쓰므로 보지 않는다
+	const TPair<const TCHAR*, const UAnimMontage*> Slots[] = {
+		{ TEXT("FlinchMontage(움찔)"), FlinchMontage.Get() },
+		{ TEXT("StaggerMontage(경직)"), StaggerMontage.Get() },
+		{ TEXT("KnockdownMontage(넘어짐)"), KnockdownMontage.Get() },
+		{ TEXT("GroggyMontage(그로기)"), GroggyMontage.Get() },
+		{ TEXT("DodgeMontage(회피)"), DodgeMontage.Get() },
+		{ TEXT("GuardMontage(가드)"), GuardMontage.Get() },
+		{ TEXT("DeathMontage(사망)"), DeathMontage.Get() },
+	};
+	for (const TPair<const TCHAR*, const UAnimMontage*>& Slot : Slots)
+	{
+		if (!Slot.Value)
+		{
+			Warning(FString::Printf(TEXT("%s가 비어 있습니다. 이 동작을 하지 않습니다"), Slot.Key));
+		}
+	}
+
+	if (KnockdownMontage && !CombatDataValidation::HasTagWindow(KnockdownMontage, CombatTags::State_Downed))
+	{
+		Warning(FString::Printf(TEXT("넘어짐 몽타주 %s에 State.Downed 구간이 없습니다. 누운 동안에도 다시 맞으면 반응합니다"), *KnockdownMontage->GetName()));
+	}
+	if (DodgeMontage && !CombatDataValidation::HasTagWindow(DodgeMontage, CombatTags::State_Invulnerable))
+	{
+		Warning(FString::Printf(TEXT("회피 몽타주 %s에 State.Invulnerable 구간이 없습니다. 회피 중에도 맞습니다"), *DodgeMontage->GetName()));
+	}
+	if (PartialReactionRootBones.IsEmpty())
+	{
+		Warning(TEXT("부위 대표 본(PartialReactionRootBones)이 없습니다. 모든 부위 반응이 대체 본에서 시작합니다"));
+	}
+
+	return Result;
+}
+#endif
