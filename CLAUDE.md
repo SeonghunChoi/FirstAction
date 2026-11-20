@@ -52,8 +52,10 @@
   - Python 원격 실행: 엔진 내장 PythonScriptPlugin의 Remote Execution(로컬 `127.0.0.1`만). 설정은 `Saved/Config/WindowsEditor/Engine.ini`(git 제외). 클라이언트는 엔진 `remote_execution.py`
   - 그래프 덤프: `FirstAction.DumpBlueprintGraph <에셋 경로>` → `Saved/GraphDumps/<이름>.txt` (블루프린트·애님 BP의 모든 그래프, 노드 속성, 핀 연결, 변수)
   - 노드 삭제: `FirstAction.RemoveBlueprintNodes <에셋 경로> <노드 이름...>` (덤프의 노드 이름. 컴파일·저장은 Python)
-  - 몽타주 편집: `unreal.FirstActionEditorLibrary`(`set_montage_slot`, `set_montage_segments`, `set_montage_sections`, `describe_montage`). 노티파이·커브는 엔진 `AnimationLibrary`
-  - 배포판 생성 스크립트: `Tools/Release/common.py` + 캐릭터별 스크립트(`aurora.py` 공격, `aurora_body.py` 반응·데이터·BP·GameMode). 다시 돌려도 같은 결과가 나오게 지우고 새로 만든다
+  - 몽타주 편집: `unreal.FirstActionEditorLibrary`(`set_montage_slot`, `set_montage_segments`, `set_montage_segment_ranges`(클립 일부만), `set_montage_sections`, `describe_montage`). 노티파이·커브는 엔진 `AnimationLibrary`
+  - 배포판 생성 스크립트: `Tools/Release/common.py` + 캐릭터별 스크립트(`aurora.py` 공격, `aurora_body.py` 반응·회피·데이터·BP·GameMode, `gasp_import.py` GASP FBX 임포트(마네킹 스켈레톤 지정), `retarget_gasp_aurora.py` IK Rig 자동 생성·리타기터·일괄 리타깃). 실행: `cat common.py <스크립트> > tmp && python Tools/ue_exec.py tmp`. 에셋이 있으면 지우지 않고 그 자리에서 갱신한다(지우면 다른 에셋의 참조가 끊긴다)
+  - 일괄 리타깃(`IKRetargetBatchOperation`)은 원본 폴더를 레지스트리가 모르면 결과를 `/Game` 바로 아래에 만든다(9-3에서 겪음, 18개를 디스크에서 지움). 스크립트가 먼저 폴더를 스캔하고 결과를 `rename_loaded_asset`으로 옮긴다. 작업 후 `Content/*.uasset`가 없는지 확인한다
+  - 리타깃하면 IK 뼈(`ik_foot_l/r`, `ik_hand_l/r`)는 체인에 없어 기준 자세에 남고, Paragon 애님 BP의 다리 IK가 발을 그 자리로 끌어 두 발이 붙는다(9-3 회피에서 겪음). 리타기터 끝에 Pin Bone 오퍼레이션(대상의 `foot`/`hand` → IK 뼈, 전역 위치)을 둔다. 리타기터는 `remove_all_ops` 뒤 다시 만든다(안 그러면 실행마다 오퍼레이션이 쌓인다). 플레이 중에는 스크립트가 멈춘다
   - 배포 맵은 파일 단위 액터 저장이라 액터가 `Content/__ExternalActors__/ThirdParty/`에 생긴다. `.gitignore` 대상
   - 빌드: 에디터를 닫아야 할 때 Claude가 원격으로 저장 여부를 확인하고 `quit_editor`로 닫은 뒤 명령줄(`Build.bat`)로 빌드하고 다시 연다 (사용자 허락, 2026-11-20)
 
@@ -462,7 +464,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 9-3 (1/? 설계·판정 소켓): 배포판 구성 결정(범위·배포 맵·Custom Config 타깃·대검·보유 Paragon: 플레이어 Greystone, 적 Kwang·적 전용 데이터·배포 맵 전용 BP·몸 메시 판정 소켓, PLAN 9장). Unity 311개·Fab 라이브러리 조사, Paragon Greystone/Kwang/Aurora를 `ThirdParty/`로. `UMeleeTraceComponent::SetBodyMesh`/`FindBladeMesh`(무기 메시 → 몸 메시 순으로 소켓 쌍), 콘텐츠 세트 누락 경고에서 `/Game/ThirdParty/` 제외, 에셋 규칙 3항을 기본 세트에만 적용. 두 스켈레톤에 `blade_start`/`blade_end`. 확인: 깃 버전 판정 그대로(더미 `thigh_r`), 소켓 저장. 알게 된 것: GASP 애니메이션 FBX 팩은 "프로젝트에 추가"로 넣으면 스켈레톤 없이 임포트돼 전부 실패(수동 임포트 필요), Aurora 샘플 BP 컴파일 오류(쓰지 않음) (2026-11-20)
 
 ### 현재 위치
-- **Step 9-3** 진행 중: Aurora 플레이어 2차(사용자 콤보표: 약 Fast_A→B→C→D, C→강 Slow_D, D→강 Ability_E, 강 단독 Primary_B→C→Slow_D, 돌진 후보 Ability_Q). 제자리 몽타주 접근 이동(`GA_MeleeAttack::ScheduleApproaches`/`StartApproach`, 워핑 구간 동안 Root Motion Source). 시험: 판정 구간 152개 중 131개 명중(86%), 접근 평균 28~125cm. 애님 BP 3종 정리, 행동 중 이동 입력 차단(`MovementBlockedTags`), Paragon 샘플 BP 오류 노드 정리. 다음: GASP 회피 옆걸음 리타깃 → Kwang·Greystone 적 → 환경 맵
+- **Step 9-3** 진행 중: Aurora 플레이어 2차 + 돌진 회피(`Ability_Q`, 몸 돌리기 + 코드 이동 300cm, `AM_Aurora_Dodge_Dash`). 방향별 회피 기능(`UCombatCharacterData::DodgeBack/Left/RightMontage`·`DodgeDistance`, `GA_Dodge::ScheduleMove`, `ACombatCharacterBase::ApplyTimedMove`)은 데이터로 켜고 끈다. 이동이 막힌 공격·회피 중에도 스틱 방향을 기록(`DesiredInputDirection`). 돌진 회피는 여러 방향에서 몸 돌리기·300cm 이동·완료 종료 확인(2026-11-20). 다음: Kwang·Greystone 적 → 환경 맵
 - 알려진 현상: 점프 중에 맞으면 공중에서 경직 몽타주가 재생된다(공중 피격 반응은 따로 없음). 배포 빌드 후보
 - Step 7 마무리 점검에서 확인됨 (2026-11-19): 머리 몽타주(`AM_UAL1_Hit_Head`, 맞은 본 head), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직·그로기 중 회피 금지(입력은 버퍼로만), 슬로모션 중 히트스톱 겹침(6-13, 히트스톱 뒤 슬로모션 유지. 슬로모션 1.5초가 짧게 느껴짐 → 배포 빌드 튜닝 후보)
 - Step 8에서 다시 확인할 것 (Step 7 마무리에서 사용자 판단으로 이월, 적 2체로 시험하면 쉬움): 누운 구간 반응 없음(6-7), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
@@ -572,6 +574,8 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-20: (처음 결정) 배포판은 이동 후 공격(9-3). Paragon 공격이 모두 제자리 동작이고 GASP에는 무기 공격이 없어, 워핑은 방향만 맞추고 적은 공격 거리까지 걸어 들어간다
 - 2026-11-20: 배포판 Aurora는 가드·패리 없이 회피(GASP 옆걸음 리타깃)·저스트 회피만(9-3). 방어 3종 비교는 깃 버전에서
 - 2026-11-20: **변경** Aurora 콤보는 사용자 콤보표(9-3 시험 후): 약 Fast_A→B→C→D, C에서 강→Slow_D, D에서 강→Ability_E, 강 단독 Primary_B→C→Slow_D. Ability_Q는 돌진 기술 후보
+- 2026-11-20: Aurora 회피는 방향별 몽타주 4개 + 코드 이동(9-3 시험 후). 몸을 돌리지 않고 입력 방향으로 몽타주를 고르며, 루트 모션 대신 `DodgeDistance`만큼 옮긴다. Slide는 부적합. 이것도 어색하면 Ability_Q 돌진
+- 2026-11-20: **변경** Aurora 회피는 `Ability_Q` 돌진(9-3 2차 시험 후). 입력 방향으로 몸을 돌리고 코드로 300cm, 원본 0.12~0.95초 1.2배속. 방향별 몽타주 칸은 비워 둔다(기능은 남김)
 - 2026-11-20: (처음 안) Aurora 콤보는 빠른 연타형(9-3). 약 Fast_A→B→C→D, 약 중 강은 Ability_Q(Ability_R은 칼이 머리 위로 돌아 맞지 않아 시험 후 교체), 강 단독은 Ability_E
 - 2026-11-20: 적 콤보(9-3). Kwang Combo3·Combo4·Flurry, Greystone QuickJab·HeavyCombo·Slam·Mix (PLAN 9장)
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다

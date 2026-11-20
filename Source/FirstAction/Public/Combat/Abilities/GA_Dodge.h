@@ -46,4 +46,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> MontageTask;
+
+	// 루트 모션 없는 회피 몽타주의 코드 이동 (9-3): 몽타주의 Motion Warping 구간 동안 Direction으로 Distance만큼
+	void ScheduleMove(const class UAnimMontage* Montage, const FVector& Direction, float Distance);
+	FTimerHandle MoveTimer;
 };

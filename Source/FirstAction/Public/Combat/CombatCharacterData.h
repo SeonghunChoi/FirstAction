@@ -43,6 +43,14 @@ public:
 
 	UAnimMontage* GetDodgeMontage() const { return DodgeMontage; }
 
+	// 방향별 회피 몽타주가 하나라도 있으면 true (9-3). 이때 회피는 몸을 돌리지 않고 입력 방향에 맞는 몽타주를 고른다
+	bool HasDirectionalDodge() const { return DodgeBackMontage || DodgeLeftMontage || DodgeRightMontage; }
+
+	// 몸 정면 기준 입력 각도(도, 오른쪽 +)에 맞는 회피 몽타주. 그 방향이 비어 있으면 DodgeMontage
+	UAnimMontage* FindDodgeMontage(float LocalYawDegrees) const;
+
+	float GetDodgeDistance() const { return DodgeDistance; }
+
 	UAnimMontage* GetGuardMontage() const { return GuardMontage; }
 
 	UAnimMontage* GetDeathMontage() const { return DeathMontage; }
@@ -61,6 +69,22 @@ protected:
 	// 반응 몽타주처럼 몸마다 다르므로 캐릭터 데이터에 둔다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dodge")
 	TObjectPtr<UAnimMontage> DodgeMontage;
+
+	// 방향별 회피 (9-3). 하나라도 있으면 몸을 돌리지 않고, 입력이 몸 정면 기준 어느 쪽인지(앞 ±45°, 뒤, 좌, 우)로 몽타주를 고른다.
+	// DodgeMontage가 앞쪽이다. 비어 있는 방향은 DodgeMontage를 쓴다. 깃 버전은 비워 두어 "돌고 앞구르기"를 그대로 쓴다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dodge")
+	TObjectPtr<UAnimMontage> DodgeBackMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dodge")
+	TObjectPtr<UAnimMontage> DodgeLeftMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dodge")
+	TObjectPtr<UAnimMontage> DodgeRightMontage;
+
+	// 코드로 옮기는 회피 거리 (9-3). 0이면 몽타주 루트 모션으로 움직인다(깃 버전).
+	// 0보다 크고 몽타주에 루트 모션이 없으면, 몽타주의 Motion Warping 구간 동안 입력 방향으로 이 거리만큼 옮긴다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dodge", meta = (ClampMin = "0.0", Units = "Centimeters"))
+	float DodgeDistance = 0.f;
 
 	// 가드 몽타주 (6-11). 구간 세 개: Start(올림, 앞부분에 Window.Parry) → Loop(유지, 반복) → End(내림, 뒷부분에 Window.Cancel)
 	// 버튼을 떼면 End로 넘어가고, 몽타주가 끝나면 가드가 끝난다. 구간 이름은 GA_Guard 기본값과 같아야 한다

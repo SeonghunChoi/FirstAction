@@ -61,8 +61,12 @@ ACombatCharacterBase::ACombatCharacterBase()
 
 FVector ACombatCharacterBase::GetAttackTargetDirection() const
 {
-	// 마지막 이동 틱에서 소비한 이동 입력. 스틱을 놓으면 0이 된다
-	const FVector InputDirection = GetLastMovementInputVector().GetSafeNormal2D();
+	// 스틱 방향 (이동이 막힌 공격·회피 중에도 기록된 값). 없으면 마지막 이동 틱에서 소비한 이동 입력
+	FVector InputDirection = DesiredInputDirection;
+	if (InputDirection.IsNearlyZero())
+	{
+		InputDirection = GetLastMovementInputVector().GetSafeNormal2D();
+	}
 	return InputDirection.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : InputDirection;
 }
 
@@ -458,6 +462,9 @@ void ACombatCharacterBase::BufferInput(const FGameplayTag& InputTag)
 
 void ACombatCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
+	// 이동이 막혀도 스틱 방향은 기록한다 (9-3)
+	PendingDesiredInput += WorldDirection * ScaleValue;
+
 	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(CombatTags::State_Guarding))
 	{
 		// 가드 중: 이동하지 않고 방향만 모은다. Tick에서 돈다 (6-11 결정)
@@ -475,6 +482,10 @@ void ACombatCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleV
 void ACombatCharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// 이번 프레임에 모인 스틱 방향 (다음 프레임의 대상 선택·회피 방향에 쓴다)
+	DesiredInputDirection = PendingDesiredInput.GetSafeNormal2D();
+	PendingDesiredInput = FVector::ZeroVector;
 
 	// 가드 중 스틱 방향으로 정해진 속도로 돈다. DeltaSeconds는 히트스톱에 맞춰 줄어 있으므로 멈춤 중에는 거의 돌지 않는다
 	const FVector TurnDirection = GuardTurnInput.GetSafeNormal2D();
@@ -727,4 +738,27 @@ void ACombatCharacterBase::ApplyContentSet()
 			WeaponMesh->SetStaticMesh(Weapon);
 		}
 	}
+}
+
+void ACombatCharacterBase::ApplyTimedMove(FName SourceName, const FVector& TargetLocation, float Duration)
+{
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (!Movement)
+	{
+		return;
+	}
+	Movement->RemoveRootMotionSource(SourceName);
+
+	TSharedPtr<FRootMotionSource_MoveToForce> Source = MakeShared<FRootMotionSource_MoveToForce>();
+	Source->InstanceName = SourceName;
+	Source->AccumulateMode = ERootMotionAccumulateMode::Override;
+	Source->Priority = 4;
+	Source->StartLocation = GetActorLocation();
+	Source->TargetLocation = FVector(TargetLocation.X, TargetLocation.Y, Source->StartLocation.Z);
+	Source->Duration = FMath::Max(Duration, 0.05f);
+	Source->bRestrictSpeedToExpected = true;
+	// 도착하면 멈춘다. 기본값(마지막 속도 유지)이면 계속 미끄러진다
+	Source->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
+	Source->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
+	Movement->ApplyRootMotionSource(Source);
 }

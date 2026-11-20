@@ -34,25 +34,36 @@ def ensure_dir(path):
         EAL.make_directory(path)
 
 
+# 플레이 중에는 에셋 생성·로드가 거부된다(9-3에서 겪음). 시작하자마자 멈춘다
+if unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world():
+    raise RuntimeError('에디터가 플레이 중이다. 플레이를 멈추고 다시 실행한다')
+
+
 def load_or_create(path, asset_class, factory):
     """있으면 그 에셋을 그대로 쓰고(다른 에셋의 참조가 끊기지 않게), 없으면 만든다.
     지우고 다시 만들면 그 에셋을 가리키던 참조(BP 부여 목록 등)가 비어 버린다"""
-    if EAL.does_asset_exist(path):
-        return unreal.load_asset(path)
+    # does_asset_exist는 에셋 레지스트리가 아직 모르는 새 에셋(IK Rig 등)에 False를 낼 때가 있어 먼저 로드해 본다
+    name_only = path.rsplit("/", 1)[1]
+    existing = unreal.find_object(None, path + "." + name_only) or (unreal.load_asset(path) if EAL.does_asset_exist(path) else None)
+    if existing is not None:
+        return existing
     folder, name = path.rsplit("/", 1)
     ensure_dir(folder)
     return TOOLS.create_asset(name, folder, asset_class, factory)
 
 
-def make_montage(path, anims, rates=None, sections=None, blend_in=0.1, blend_out=0.15, slot=ANIM_SLOT):
-    """anims: 시퀀스 경로 목록(이어 붙임). sections: [(이름, 시작 시간, 다음 이름)]"""
+def make_montage(path, anims, rates=None, sections=None, blend_in=0.1, blend_out=0.15, slot=ANIM_SLOT, ranges=None):
+    """anims: 시퀀스 경로 목록(이어 붙임). sections: [(이름, 시작 시간, 다음 이름)]. ranges: 시퀀스별 사용 구간 [(시작, 끝)]"""
     seqs = [unreal.load_asset(a) for a in anims]
     factory = unreal.AnimMontageFactory()
     factory.set_editor_property("source_animation", seqs[0])
     m = load_or_create(path, unreal.AnimMontage, factory)
     ANIM.remove_all_animation_notify_tracks(m)   # 다시 돌릴 때 노티파이를 처음부터
     LIB.set_montage_slot(m, slot)
-    LIB.set_montage_segments(m, seqs, rates or [])
+    if ranges:
+        LIB.set_montage_segment_ranges(m, seqs, [r[0] for r in ranges], [r[1] for r in ranges], rates or [])
+    else:
+        LIB.set_montage_segments(m, seqs, rates or [])
     if sections:
         LIB.set_montage_sections(m, [s[0] for s in sections], [s[1] for s in sections], [s[2] or "None" for s in sections])
     m.set_editor_property("blend_in", alpha_blend(blend_in))
@@ -110,4 +121,8 @@ def link(input_tag, next_attack):
 
 def save_all(paths):
     for p in paths:
-        EAL.save_asset(p, only_if_is_dirty=False)
+        obj = unreal.find_object(None, p + "." + p.rsplit("/", 1)[1])
+        if obj is not None:
+            EAL.save_loaded_asset(obj, only_if_is_dirty=False)
+        else:
+            EAL.save_asset(p, only_if_is_dirty=False)

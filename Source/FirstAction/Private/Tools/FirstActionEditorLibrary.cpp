@@ -21,6 +21,12 @@ bool UFirstActionEditorLibrary::SetMontageSlot(UAnimMontage* Montage, FName Slot
 
 bool UFirstActionEditorLibrary::SetMontageSegments(UAnimMontage* Montage, const TArray<UAnimSequenceBase*>& Animations, const TArray<float>& PlayRates)
 {
+	return SetMontageSegmentRanges(Montage, Animations, {}, {}, PlayRates);
+}
+
+bool UFirstActionEditorLibrary::SetMontageSegmentRanges(UAnimMontage* Montage, const TArray<UAnimSequenceBase*>& Animations,
+	const TArray<float>& StartTimes, const TArray<float>& EndTimes, const TArray<float>& PlayRates)
+{
 	if (!Montage || Montage->SlotAnimTracks.IsEmpty() || Animations.IsEmpty())
 	{
 		return false;
@@ -45,8 +51,10 @@ bool UFirstActionEditorLibrary::SetMontageSegments(UAnimMontage* Montage, const 
 		UAnimSequenceBase* Animation = Animations[Index];
 		FAnimSegment Segment;
 		Segment.SetAnimReference(Animation, true);
-		Segment.AnimStartTime = 0.f;
-		Segment.AnimEndTime = Animation->GetPlayLength();
+		const float Length = Animation->GetPlayLength();
+		Segment.AnimStartTime = StartTimes.IsValidIndex(Index) ? FMath::Clamp(StartTimes[Index], 0.f, Length) : 0.f;
+		Segment.AnimEndTime = EndTimes.IsValidIndex(Index) && EndTimes[Index] > Segment.AnimStartTime
+			? FMath::Min(EndTimes[Index], Length) : Length;
 		Segment.AnimPlayRate = PlayRates.IsValidIndex(Index) && PlayRates[Index] > 0.f ? PlayRates[Index] : 1.f;
 		Segment.LoopingCount = 1;
 		Segment.StartPos = Position;

@@ -162,6 +162,10 @@ public:
 	// 새 타격이 오면 남은 이동은 버리고 새 이동으로 바꾼다
 	void ApplyHitDisplacement(const FVector& Direction, float Distance, float Duration);
 
+	// 정해진 시간 동안 목표 위치까지 옮긴다 (Root Motion Source MoveTo, 도착하면 멈춤). 같은 이름의 이전 이동은 대체한다 (9-3)
+	// 제자리 동작(배포판 Paragon)의 공격 접근과 회피 이동이 쓴다
+	void ApplyTimedMove(FName SourceName, const FVector& TargetLocation, float Duration);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -285,6 +289,12 @@ private:
 	// 가드 중 이번 프레임에 들어온 이동 입력. Tick에서 그 방향으로 돌고 비운다
 	// (템플릿 이동은 앞뒤·좌우 두 번 나눠 부르므로 모아서 한 번에 처리한다)
 	FVector GuardTurnInput = FVector::ZeroVector;
+
+	// 플레이어가 누르고 있는 이동 방향 (이동이 막혀 있어도 기록한다, 9-3)
+	// 공격·회피 중에는 이동 입력을 막으므로(MovementBlockedTags) 엔진의 마지막 이동 입력은 0이 된다.
+	// 콤보 중 대상 선택과 회피 방향은 스틱 방향이 필요해 따로 모은다
+	FVector PendingDesiredInput = FVector::ZeroVector;
+	FVector DesiredInputDirection = FVector::ZeroVector;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;

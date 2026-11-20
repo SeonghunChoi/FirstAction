@@ -316,21 +316,10 @@ void UGA_MeleeAttack::StartApproach(float StopGap, float Duration)
 		return;
 	}
 
-	TSharedPtr<FRootMotionSource_MoveToForce> Source = MakeShared<FRootMotionSource_MoveToForce>();
-	Source->InstanceName = ApproachSourceName;
-	Source->AccumulateMode = ERootMotionAccumulateMode::Override;
-	Source->Priority = 4;
-	Source->StartLocation = Character->GetActorLocation();
-	Source->TargetLocation = FVector(Goal.X, Goal.Y, Source->StartLocation.Z);
-	Source->Duration = FMath::Max(Duration, 0.05f);
-	Source->bRestrictSpeedToExpected = true;
-	// 도착하면 멈춘다. 기본값(마지막 속도 유지)이면 휘두르는 동안 계속 미끄러진다
-	Source->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
-	Source->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
-	Movement->ApplyRootMotionSource(Source);
+	Character->ApplyTimedMove(ApproachSourceName, Goal, Duration);
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 접근: %s %.0fcm / %.2f초 (제자리 동작, Root Motion Source)"),
-		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), MoveDistance, Source->Duration);
+		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), MoveDistance, Duration);
 }
 
 void UGA_MeleeAttack::ClearApproaches()

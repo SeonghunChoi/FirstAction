@@ -3,6 +3,21 @@
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 
+UAnimMontage* UCombatCharacterData::FindDodgeMontage(float LocalYawDegrees) const
+{
+	UAnimMontage* Chosen = nullptr;
+	const float AbsYaw = FMath::Abs(LocalYawDegrees);
+	if (AbsYaw >= 135.f)
+	{
+		Chosen = DodgeBackMontage;
+	}
+	else if (AbsYaw > 45.f)
+	{
+		Chosen = LocalYawDegrees > 0.f ? DodgeRightMontage : DodgeLeftMontage;
+	}
+	return Chosen ? Chosen : DodgeMontage.Get();
+}
+
 #if WITH_EDITOR
 #include "Combat/CombatDataValidation.h"
 #include "Combat/CombatTags.h"

@@ -7,6 +7,8 @@
 #include "Combat/CombatCharacterData.h"
 #include "Combat/CombatTags.h"
 #include "FirstAction.h"
+#include "AnimNotifyState_MotionWarping.h"
+#include "TimerManager.h"
 
 UGA_Dodge::UGA_Dodge()
 {
@@ -44,7 +46,24 @@ void UGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(GetAvatarActorFromActorInfo());
 	const UCombatCharacterData* Data = Character ? Character->GetCharacterData() : nullptr;
-	UAnimMontage* Montage = UCombatContentSubsystem::ResolveMontage(this, Data ? Data->GetDodgeMontage() : nullptr);
+	const FVector Direction = Character ? Character->GetDodgeDirection().GetSafeNormal2D() : FVector::ZeroVector;
+
+	UAnimMontage* Chosen = Data ? Data->GetDodgeMontage() : nullptr;
+	float LocalYaw = 0.f;
+	if (Data && Data->HasDirectionalDodge() && !Direction.IsNearlyZero())
+	{
+		// 방향별 회피 (9-3): 몸은 그대로, 입력이 몸 정면 기준 어느 쪽인지로 몽타주를 고른다
+		const FVector Forward = Character->GetActorForwardVector().GetSafeNormal2D();
+		LocalYaw = FMath::RadiansToDegrees(FMath::Atan2(FVector::CrossProduct(Forward, Direction).Z, FVector::DotProduct(Forward, Direction)));
+		Chosen = Data->FindDodgeMontage(LocalYaw);
+	}
+	else if (!Direction.IsNearlyZero())
+	{
+		// 회피 방향으로 몸을 즉시 돌린다. 몽타주는 앞구르기 하나라 몸이 향한 쪽으로 구른다 (6-9 결정)
+		Character->SetActorRotation(Direction.Rotation());
+	}
+
+	UAnimMontage* Montage = UCombatContentSubsystem::ResolveMontage(this, Chosen);
 	if (!Montage)
 	{
 		UE_LOG(LogFirstAction, Warning, TEXT("[%s] GA_Dodge: 캐릭터 데이터에 Dodge Montage가 없습니다"), *GetNameSafe(Character));
@@ -52,15 +71,8 @@ void UGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	// 회피 방향으로 몸을 즉시 돌린다. 몽타주는 앞구르기 하나라 몸이 향한 쪽으로 구른다 (6-9 결정)
-	const FVector Direction = Character->GetDodgeDirection().GetSafeNormal2D();
-	if (!Direction.IsNearlyZero())
-	{
-		Character->SetActorRotation(Direction.Rotation());
-	}
-
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] 회피 시작: %s, 방향 %s"),
-		*GetNameSafe(Character), *GetNameSafe(Montage), *Direction.ToCompactString());
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 회피 시작: %s, 방향 %s (몸 기준 %.0f도)"),
+		*GetNameSafe(Character), *GetNameSafe(Montage), *Direction.ToCompactString(), LocalYaw);
 
 	// 같은 슬롯의 공격·움찔 몽타주는 여기서 끊기고, 그 어빌리티는 자기 몽타주 취소 콜백으로 끝난다
 	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, Montage);
@@ -69,6 +81,57 @@ void UGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	MontageTask->OnInterrupted.AddDynamic(this, &UGA_Dodge::OnMontageCancelled);
 	MontageTask->OnCancelled.AddDynamic(this, &UGA_Dodge::OnMontageCancelled);
 	MontageTask->ReadyForActivation();
+
+	// 루트 모션이 없는 회피 몽타주는 코드로 옮긴다 (9-3). 방향은 입력, 없으면 몸 정면
+	if (Data && Data->GetDodgeDistance() > 0.f && !Montage->HasRootMotion())
+	{
+		ScheduleMove(Montage, Direction.IsNearlyZero() ? Character->GetActorForwardVector().GetSafeNormal2D() : Direction, Data->GetDodgeDistance());
+	}
+}
+
+void UGA_Dodge::ScheduleMove(const UAnimMontage* Montage, const FVector& Direction, float Distance)
+{
+	ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(GetAvatarActorFromActorInfo());
+	UWorld* World = Character ? Character->GetWorld() : nullptr;
+	if (!World)
+	{
+		return;
+	}
+
+	// 이동 구간 = 몽타주의 Motion Warping 구간 (공격 접근과 같은 약속). 없으면 몽타주 앞 절반
+	const float Rate = FMath::Max(Montage->RateScale, KINDA_SMALL_NUMBER);
+	float StartTime = 0.f;
+	float Duration = Montage->GetPlayLength() * 0.5f;
+	for (const FAnimNotifyEvent& Event : Montage->Notifies)
+	{
+		if (Cast<UAnimNotifyState_MotionWarping>(Event.NotifyStateClass))
+		{
+			StartTime = Event.GetTriggerTime();
+			Duration = Event.GetDuration();
+			break;
+		}
+	}
+
+	static const FName DodgeMoveSourceName(TEXT("DodgeMove"));
+	TWeakObjectPtr<ACombatCharacterBase> WeakCharacter = Character;
+	auto Start = [WeakCharacter, Direction, Distance, Duration = Duration / Rate]()
+	{
+		if (ACombatCharacterBase* C = WeakCharacter.Get())
+		{
+			C->ApplyTimedMove(DodgeMoveSourceName, C->GetActorLocation() + Direction * Distance, Duration);
+			UE_LOG(LogFirstAction, Log, TEXT("[%s] 회피 이동 %.0fcm / %.2f초 (Root Motion Source)"), *C->GetName(), Distance, Duration);
+		}
+	};
+
+	World->GetTimerManager().ClearTimer(MoveTimer);
+	if (StartTime <= KINDA_SMALL_NUMBER)
+	{
+		Start();
+	}
+	else
+	{
+		World->GetTimerManager().SetTimer(MoveTimer, FTimerDelegate::CreateWeakLambda(this, Start), StartTime / Rate, false);
+	}
 }
 
 void UGA_Dodge::EndAbility(const FGameplayAbilitySpecHandle Handle,
@@ -83,6 +146,13 @@ void UGA_Dodge::EndAbility(const FGameplayAbilitySpecHandle Handle,
 			*GetNameSafe(GetAvatarActorFromActorInfo()), bWasCancelled ? TEXT("끊김") : TEXT("완료"));
 	}
 
+	if (const AActor* Avatar = GetAvatarActorFromActorInfo())
+	{
+		if (UWorld* World = Avatar->GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(MoveTimer);
+		}
+	}
 	MontageTask = nullptr;
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

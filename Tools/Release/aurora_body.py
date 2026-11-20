@@ -17,7 +17,20 @@ knock = make_montage(OUT + "Montages/AM_Aurora_Knockback", [SRC + "Animations/Kn
 add_window(knock, 0.95, 1.65, "State.Downed")
 groggy = make_montage(OUT + "Montages/AM_Aurora_Groggy", [SRC + "Animations/Stun_Start", SRC + "Animations/Stun_Loop"], blend_out=0.25)
 death = make_montage(OUT + "Montages/AM_Aurora_Death", [SRC + "Animations/Death"], blend_out=0.0)
-saved += [OUT + "Montages/" + n for n in ["AM_Aurora_Hit_Front", "AM_Aurora_Hit_Front_Stagger", "AM_Aurora_Knockback", "AM_Aurora_Groggy", "AM_Aurora_Death"]]
+# 회피 (9-3 시험 후 변경): Aurora Ability_Q(낮게 뛰어들어 미끄러지는 동작)를 돌진 회피로 쓴다.
+# 방향별 옆걸음(GASP 리타깃)은 어색해 쓰지 않는다. 몸을 입력 방향으로 돌리고(깃 구르기와 같은 방식) 코드로 DodgeDistance만큼 옮긴다.
+# 원본 2.5초 중 0~0.25 준비, 0.25~0.45 뛰어듦, 0.45~0.85 미끄러짐, 0.9~1.45 디딤, 1.5~2.3 일어남(골반 높이로 측정).
+# 0.12~0.95초만 1.2배속으로 쓰고, 이동 구간은 뛰어듦~미끄러짐(원본 0.25~0.85)
+DASH_SEQ = SRC + "Animations/Ability_Q"
+DASH_RANGE, DASH_RATE = (0.12, 0.95), 1.2
+to_montage = lambda t: (t - DASH_RANGE[0]) / DASH_RATE
+dodge = make_montage(OUT + "Montages/AM_Aurora_Dodge_Dash", [DASH_SEQ], rates=[DASH_RATE], ranges=[DASH_RANGE], blend_in=0.05, blend_out=0.25)
+add_warp(dodge, to_montage(0.25), to_montage(0.85))   # 이동 구간
+add_window(dodge, 0.0, 0.15, "Window.JustDodge")
+add_window(dodge, 0.03, 0.45, "State.Invulnerable")
+add_window(dodge, 0.55, dodge.get_play_length(), "Window.Cancel")
+log("dash dodge length", round(dodge.get_play_length(), 3), "move", round(to_montage(0.25), 3), round(to_montage(0.85), 3))
+saved += [OUT + "Montages/" + n for n in ["AM_Aurora_Hit_Front", "AM_Aurora_Hit_Front_Stagger", "AM_Aurora_Knockback", "AM_Aurora_Groggy", "AM_Aurora_Death", "AM_Aurora_Dodge_Dash"]]
 
 # 캐릭터 데이터: 깃 플레이어 데이터를 틀로
 cdata = make_data(OUT + "Data/DA_Character_Aurora", "/Game/Portfolio/Data/Characters/DA_Character_Player", dict(
@@ -25,7 +38,8 @@ cdata = make_data(OUT + "Data/DA_Character_Aurora", "/Game/Portfolio/Data/Charac
     flinch_montage=hit, flinch_head_montage=hit,
     stagger_montage=stagger, stagger_head_montage=stagger,
     knockdown_montage=knock, groggy_montage=groggy, death_montage=death,
-    dodge_montage=None, guard_montage=None,
+    dodge_montage=dodge, dodge_back_montage=None, dodge_left_montage=None, dodge_right_montage=None,  # 방향별 칸을 비워 두면 몸을 돌려 돌진
+    dodge_distance=300.0, guard_montage=None,
 ))
 saved.append(OUT + "Data/DA_Character_Aurora")
 save_all(saved)

@@ -31,6 +31,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FirstAction|Editor")
 	static bool SetMontageSegments(UAnimMontage* Montage, const TArray<UAnimSequenceBase*>& Animations, const TArray<float>& PlayRates);
 
+	// SetMontageSegments + 애니메이션별 사용 구간(초). EndTimes[i] <= 0이면 끝까지 (GASP 회피처럼 뒤에 긴 대기 자세가 붙은 클립을 잘라 쓴다)
+	UFUNCTION(BlueprintCallable, Category = "FirstAction|Editor")
+	static bool SetMontageSegmentRanges(UAnimMontage* Montage, const TArray<UAnimSequenceBase*>& Animations,
+		const TArray<float>& StartTimes, const TArray<float>& EndTimes, const TArray<float>& PlayRates);
+
 	// 몽타주 구간을 다시 만든다. NextNames[i]가 비어 있으면 다음 구간으로 넘어가지 않는다
 	UFUNCTION(BlueprintCallable, Category = "FirstAction|Editor")
 	static bool SetMontageSections(UAnimMontage* Montage, const TArray<FName>& Names, const TArray<float>& StartTimes, const TArray<FName>& NextNames);
