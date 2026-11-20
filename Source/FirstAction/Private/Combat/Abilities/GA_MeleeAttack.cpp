@@ -1,4 +1,5 @@
 #include "Combat/Abilities/GA_MeleeAttack.h"
+#include "Content/CombatContentSubsystem.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -159,7 +160,9 @@ void UGA_MeleeAttack::PlayCurrentAttackMontage()
 
 	// 몽타주를 재생하고 끝날 때까지 기다리는 어빌리티 태스크 (코루틴의 yield 지점에 해당)
 	// 어빌리티가 먼저 끝나면 몽타주도 함께 멈춘다(bStopWhenAbilityEnds 기본값 true)
-	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, CurrentAttack->Montage);
+	// 콘텐츠 세트(9-1): 배포 세트에 짝이 있으면 그 몽타주를 재생한다. 공격 데이터는 한 벌
+	UAnimMontage* Montage = UCombatContentSubsystem::ResolveMontage(this, CurrentAttack->Montage);
+	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, Montage);
 	MontageTask->OnCompleted.AddDynamic(this, &UGA_MeleeAttack::OnMontageFinished);
 	MontageTask->OnBlendOut.AddDynamic(this, &UGA_MeleeAttack::OnMontageFinished);
 	MontageTask->OnInterrupted.AddDynamic(this, &UGA_MeleeAttack::OnMontageCancelled);

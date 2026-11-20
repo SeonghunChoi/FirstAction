@@ -1,4 +1,5 @@
 #include "Combat/Abilities/GA_Death.h"
+#include "Content/CombatContentSubsystem.h"
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
@@ -49,7 +50,7 @@ void UGA_Death::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	// 3. 사망 몽타주 → 래그돌 (7-1 결정)
 	const UCombatCharacterData* Data = Character->GetCharacterData();
-	UAnimMontage* Montage = Data ? Data->GetDeathMontage() : nullptr;
+	UAnimMontage* Montage = UCombatContentSubsystem::ResolveMontage(this, Data ? Data->GetDeathMontage() : nullptr);
 	if (!Montage)
 	{
 		UE_LOG(LogFirstAction, Warning, TEXT("[%s] GA_Death: 캐릭터 데이터에 Death Montage가 없어 바로 래그돌로"), *GetNameSafe(Character));

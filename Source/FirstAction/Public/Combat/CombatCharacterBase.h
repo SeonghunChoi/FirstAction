@@ -164,6 +164,10 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	// 콘텐츠 세트(9-1): 활성 세트에 짝이 있으면 몸 메시, 애님 BP, 무기 메시를 바꿔 끼운다. BeginPlay 맨 앞에서 부른다
+	// 블루프린트에는 기본 에셋만 둔다 (Portfolio → ThirdParty 하드 참조 금지, 에셋 규칙 1)
+	void ApplyContentSet();
 	virtual void PossessedBy(AController* NewController) override;
 
 	// 이 캐릭터의 몸의 성질 (질량 등). 플레이어와 적이 같은 형식 (Step 6-3, 설계 규칙 6-3)

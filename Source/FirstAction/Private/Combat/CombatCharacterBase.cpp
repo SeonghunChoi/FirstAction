@@ -22,6 +22,9 @@
 #include "Combat/CombatCharacterData.h"
 #include "Combat/HitResolveSubsystem.h"
 #include "Combat/CombatSettings.h"
+#include "Content/CombatContentSubsystem.h"
+#include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
 
@@ -569,6 +572,9 @@ bool ACombatCharacterBase::ConsumeBufferedInput(const FGameplayTagContainer& Acc
 
 void ACombatCharacterBase::BeginPlay()
 {
+	// 콘텐츠 세트(9-1): 컴포넌트들이 시작하기 전에(부위 반응이 메시를 잡기 전에) 몸·무기 메시와 애님 BP를 바꿔 끼운다
+	ApplyContentSet();
+
 	Super::BeginPlay();
 
 	// 질량의 정본은 캐릭터 데이터. 엔진 물리(충격, 물체 밀기)가 쓰는 무브먼트 Mass를 같은 값으로 맞춘다 (6-3 결정)
@@ -671,6 +677,38 @@ void ACombatCharacterBase::ApplyStartupEffects()
 		if (Spec.IsValid())
 		{
 			AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		}
+	}
+}
+
+void ACombatCharacterBase::ApplyContentSet()
+{
+	USkeletalMeshComponent* Body = GetMesh();
+	if (Body)
+	{
+		USkeletalMesh* DefaultMesh = Body->GetSkeletalMeshAsset();
+		// ACharacter의 멤버 Mesh와 이름이 겹치지 않게 한다 (C4458)
+		USkeletalMesh* BodyMesh = UCombatContentSubsystem::ResolveSkeletalMesh(this, DefaultMesh);
+		if (BodyMesh != DefaultMesh)
+		{
+			Body->SetSkeletalMeshAsset(BodyMesh);
+		}
+
+		const TSubclassOf<UAnimInstance> DefaultAnimClass = Body->GetAnimClass();
+		const TSubclassOf<UAnimInstance> AnimClass = UCombatContentSubsystem::ResolveAnimClass(this, DefaultAnimClass);
+		if (AnimClass != DefaultAnimClass)
+		{
+			Body->SetAnimInstanceClass(AnimClass);
+		}
+	}
+
+	if (WeaponMesh)
+	{
+		UStaticMesh* DefaultWeapon = WeaponMesh->GetStaticMesh();
+		UStaticMesh* Weapon = UCombatContentSubsystem::ResolveStaticMesh(this, DefaultWeapon);
+		if (Weapon != DefaultWeapon)
+		{
+			WeaponMesh->SetStaticMesh(Weapon);
 		}
 	}
 }

@@ -1,4 +1,5 @@
 #include "Combat/Abilities/GA_HitReact.h"
+#include "Content/CombatContentSubsystem.h"
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
@@ -131,7 +132,8 @@ void UGA_HitReact::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	// 맞은 본으로 머리/몸통 몽타주를 고른다 (그로기 이벤트에는 타격 정보가 없다)
 	const FHitResolution* Resolution = TriggerEventData ? UHitResolveSubsystem::FindHitResolution(TriggerEventData->TargetData) : nullptr;
 	const FName HitBone = Resolution ? Resolution->Hit.BoneName : NAME_None;
-	UAnimMontage* Montage = Data ? Data->FindReactionMontage(CurrentStage, Character->GetMesh(), HitBone) : nullptr;
+	UAnimMontage* Montage = UCombatContentSubsystem::ResolveMontage(this,
+		Data ? Data->FindReactionMontage(CurrentStage, Character->GetMesh(), HitBone) : nullptr);
 
 	// 상태 태그: 경직 이상은 행동 불가(State.Staggered), 그로기는 State.Groggy도
 	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())

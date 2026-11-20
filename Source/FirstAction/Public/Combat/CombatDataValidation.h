@@ -20,6 +20,12 @@ namespace CombatDataValidation
 	// 이 클래스(또는 자식)의 노티파이 스테이트가 하나라도 있는가
 	FIRSTACTION_API bool HasNotifyState(const UAnimSequenceBase* Animation, TSubclassOf<UAnimNotifyState> NotifyStateClass);
 
+	// 이 클래스(또는 자식)의 노티파이 스테이트 개수 (콘텐츠 세트 짝 비교, 9-1)
+	FIRSTACTION_API int32 CountNotifyState(const UAnimSequenceBase* Animation, TSubclassOf<UAnimNotifyState> NotifyStateClass);
+
+	// ANS_TagWindow 구간을 태그별로 센다 (콘텐츠 세트 짝 비교, 9-1)
+	FIRSTACTION_API void CountTagWindows(const UAnimSequenceBase* Animation, TMap<FGameplayTag, int32>& OutCounts);
+
 	// 이 태그를 붙이는 ANS_TagWindow 구간이 하나라도 있는가
 	FIRSTACTION_API bool HasTagWindow(const UAnimSequenceBase* Animation, const FGameplayTag& Tag);
 

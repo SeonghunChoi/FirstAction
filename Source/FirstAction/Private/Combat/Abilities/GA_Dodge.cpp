@@ -1,4 +1,5 @@
 #include "Combat/Abilities/GA_Dodge.h"
+#include "Content/CombatContentSubsystem.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Animation/AnimMontage.h"
@@ -43,7 +44,7 @@ void UGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(GetAvatarActorFromActorInfo());
 	const UCombatCharacterData* Data = Character ? Character->GetCharacterData() : nullptr;
-	UAnimMontage* Montage = Data ? Data->GetDodgeMontage() : nullptr;
+	UAnimMontage* Montage = UCombatContentSubsystem::ResolveMontage(this, Data ? Data->GetDodgeMontage() : nullptr);
 	if (!Montage)
 	{
 		UE_LOG(LogFirstAction, Warning, TEXT("[%s] GA_Dodge: 캐릭터 데이터에 Dodge Montage가 없습니다"), *GetNameSafe(Character));

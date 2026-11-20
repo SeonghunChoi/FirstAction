@@ -196,14 +196,15 @@ Source/FirstAction/
 │   │   └── StateTree/
 │   │       └── EnemyStateTreeNodes.h  // 적 AI 조건(태그, 대상, 거리)과 태스크(접근, 맴돌기, 공격, 회복) (7-3)
 │   └── Content/
-│       ├── CombatContentSet.h
-│       └── PortfolioContentSettings.h
+│       ├── CombatContentSet.h         // 기본 → 배포 치환 표(몽타주, 애님 BP, 메시)와 짝 비교 검증 (9-1)
+│       ├── CombatContentSubsystem.h   // 활성 세트 로드·폴백, Resolve 함수 (9-1)
+│       └── PortfolioContentSettings.h // 프로젝트 설정 "Portfolio Content": Release 세트 소프트 참조
 └── Private/   (Public과 같은 구조로 .cpp)
 
 Content/
 ├── Portfolio/
 │   ├── Characters/   // 플레이어, 적 블루프린트
-│   ├── Data/         // 공격, 패턴, Default 콘텐츠 세트
+│   ├── Data/         // 공격, 캐릭터, 패턴 데이터 (Default = 치환 없음)
 │   ├── GameplayCues/ // GCN_ 에셋 (프로젝트 설정의 GameplayCue 검색 경로)
 │   ├── Animations/   // 기본 몽타주
 │   ├── AI/           // StateTree 에셋
@@ -439,8 +440,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 8-3: 데이터 검증. `UAttackDataAsset`·`UCombatCharacterData`·`UEnemyPatternDataAsset::IsDataValid`(에디터 전용), 공통 몽타주 검사 `CombatDataValidation`(노티파이 스테이트, `ANS_TagWindow` 태그, 워핑 목표 이름), `UAttackDataAsset::FindNextAttack`, `UGA_MeleeAttack::GetWarpTargetName`. 오류: 몽타주 없음, 링크 입력·다음 공격 없음·중복, 링크가 있는데 `Window.Combo` 없음, 질량 0 이하, 토큰 1 미만, 범위 뒤집힘, 패턴 시작 공격 없음, 패턴 입력 순서가 링크로 이어지지 않음. 경고: 판정·워핑 구간 없음, 워핑 목표 이름 다름, 순환 링크, 반응·회피·가드·사망 몽타주 빈칸, 넘어짐 `State.Downed`·회피 `State.Invulnerable` 없음, 패턴 없음·이름·가중치. 확인: `Portfolio/Data` 18개 오류 0·경고 3(더미 세 종 사망 몽타주 없음, 의도), 패턴 입력을 일부러 바꿔 경로까지 짚는 오류 확인 후 되돌림. `Lvl_TestEnemies`는 사용자 의도로 엘리트 1체 구성 (2026-11-20)
 - [x] ✅ Step 8 마일스톤: 엘리트 적(8-1)과 플레이어 새 공격(8-2) 모두 C++ 변경 0줄. 같은 스텝의 C++ 수정(점프, 크래시, 검증)은 콘텐츠 추가와 무관한 버그 수정·도구 (2026-11-20)
 
+- [x] Step 9-1: 콘텐츠 세트. `UCombatContentSet`(치환 표: 몽타주, 애님 BP, 스켈레탈 메시, 스태틱 메시. 짝 비교 검증과 짝 없는 기본 몽타주 목록), `UPortfolioContentSettings`(프로젝트 설정 "Portfolio Content": `ReleaseContentSet` 소프트 참조, `bUseReleaseContentSet`), `UCombatContentSubsystem`(게임 인스턴스 서브시스템, 시작할 때 Release 로드·실패 시 Default, `ResolveMontage` 등, 짝 없는 에셋 처음 한 번 경고). 몽타주 재생 5곳(공격·회피·가드·반응·사망)과 `ACombatCharacterBase::ApplyContentSet`(BeginPlay 맨 앞, 몸·무기 메시와 애님 BP)이 치환을 거친다. 검증 도구에 개수 세기 함수 추가. 시험용 `ThirdParty/Data/DA_ContentSet_Release`(짝 1개 `AM_Test_Regular_A`). 확인: Release 로드와 약1 치환, 짝 없는 에셋 경고(몽타주·메시·무기·애님 BP), 세트 검증 경고 14/15, `Window.Combo`를 지운 짝의 오류, 설정에서 끄기, ThirdParty 폴더를 치운 상태의 폴백 경고 (2026-11-20)
+
 ### 현재 위치
-- **Step 9-1** 시작 전: `UCombatContentSet`, `UPortfolioContentSettings`, 폴백
+- **Step 9-2** 시작 전: Asset Manager 기본 에셋 타입 등록 (Release 세트가 쿡에 들어가게)
 - 알려진 현상: 점프 중에 맞으면 공중에서 경직 몽타주가 재생된다(공중 피격 반응은 따로 없음). 배포 빌드 후보
 - Step 7 마무리 점검에서 확인됨 (2026-11-19): 머리 몽타주(`AM_UAL1_Hit_Head`, 맞은 본 head), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직·그로기 중 회피 금지(입력은 버퍼로만), 슬로모션 중 히트스톱 겹침(6-13, 히트스톱 뒤 슬로모션 유지. 슬로모션 1.5초가 짧게 느껴짐 → 배포 빌드 튜닝 후보)
 - Step 8에서 다시 확인할 것 (Step 7 마무리에서 사용자 판단으로 이월, 적 2체로 시험하면 쉬움): 누운 구간 반응 없음(6-7), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
@@ -529,6 +532,9 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-20: 물리 애니메이션 갱신은 부위 반응 컴포넌트가 메시 뼈 배열을 확인한 뒤 직접 부른다(8-2 중 크래시 수정)
 - 2026-11-20: 데이터 검증은 데이터 사이의 연결까지 본다(8-3). 패턴 입력 순서를 시작 공격부터 `ComboLinks`로 따라가 끊기면 오류. 공격 데이터를 고친 뒤에는 일괄 검사로 패턴까지 본다
 - 2026-11-20: 검증 등급은 깨지는 것만 오류, 일부러 그랬을 수 있는 것은 경고(8-3)
+- 2026-11-20: 콘텐츠 세트는 몽타주·메시 치환 표, 데이터는 한 벌(9-1). Default 세트는 따로 없고 치환 없음이 Default
+- 2026-11-20: Release 세트에 짝이 없는 에셋은 기본 에셋을 쓰고 처음 한 번 경고(9-1)
+- 2026-11-20: 배포 몽타주는 기본 몽타주와 구간을 비교해, 빠지면 깨지는 것(태그·판정·워핑·구간 이름·소켓)은 오류, 개수 차이는 경고(9-1)
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

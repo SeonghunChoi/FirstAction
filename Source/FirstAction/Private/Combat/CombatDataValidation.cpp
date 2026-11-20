@@ -26,6 +26,38 @@ namespace CombatDataValidation
 		return false;
 	}
 
+	int32 CountNotifyState(const UAnimSequenceBase* Animation, TSubclassOf<UAnimNotifyState> NotifyStateClass)
+	{
+		int32 Count = 0;
+		if (Animation && NotifyStateClass)
+		{
+			for (const FAnimNotifyEvent& Event : Animation->Notifies)
+			{
+				if (Event.NotifyStateClass && Event.NotifyStateClass->IsA(NotifyStateClass))
+				{
+					++Count;
+				}
+			}
+		}
+		return Count;
+	}
+
+	void CountTagWindows(const UAnimSequenceBase* Animation, TMap<FGameplayTag, int32>& OutCounts)
+	{
+		OutCounts.Reset();
+		if (!Animation)
+		{
+			return;
+		}
+		for (const FAnimNotifyEvent& Event : Animation->Notifies)
+		{
+			if (const UANS_TagWindow* Window = Cast<UANS_TagWindow>(Event.NotifyStateClass))
+			{
+				OutCounts.FindOrAdd(Window->Tag)++;
+			}
+		}
+	}
+
 	bool HasTagWindow(const UAnimSequenceBase* Animation, const FGameplayTag& Tag)
 	{
 		if (!Animation)

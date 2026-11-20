@@ -1,4 +1,5 @@
 #include "Combat/Abilities/GA_Guard.h"
+#include "Content/CombatContentSubsystem.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
@@ -46,7 +47,8 @@ void UGA_Guard::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(GetAvatarActorFromActorInfo());
 	const UCombatCharacterData* Data = Character ? Character->GetCharacterData() : nullptr;
-	GuardMontage = Data ? Data->GetGuardMontage() : nullptr;
+	// 콘텐츠 세트(9-1). 구간 이동(End, Parry)도 이 몽타주로 한다
+	GuardMontage = UCombatContentSubsystem::ResolveMontage(this, Data ? Data->GetGuardMontage() : nullptr);
 	if (!GuardMontage)
 	{
 		UE_LOG(LogFirstAction, Warning, TEXT("[%s] GA_Guard: 캐릭터 데이터에 Guard Montage가 없습니다"), *GetNameSafe(Character));
