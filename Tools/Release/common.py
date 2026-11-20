@@ -126,3 +126,53 @@ def save_all(paths):
             EAL.save_loaded_asset(obj, only_if_is_dirty=False)
         else:
             EAL.save_asset(p, only_if_is_dirty=False)
+
+
+def make_child_bp(path, parent_path):
+    """부모 BP를 물려받는 자식 BP (있으면 그 자리에서 갱신)"""
+    parent = unreal.load_asset(parent_path)
+    factory = unreal.BlueprintFactory()
+    factory.set_editor_property("parent_class", parent.generated_class())
+    return load_or_create(path, unreal.Blueprint, factory)
+
+
+def build_attacks(out, prefix, attacks, values, links):
+    """공격 몽타주·데이터를 만들고 콤보 링크를 잇는다 (9-3 적).
+    attacks: [(이름, [(시퀀스, 시작, 끝|None)], 블렌드 아웃, 판정 구간들, 워핑 (시작, 끝), 콤보 구간|None, 캔슬 시작)]
+    values: {이름: (틀 데이터 경로, 값)}, links: {이름: [(입력 태그, 다음 이름)]}"""
+    saved, montages, data = [], {}, {}
+    for name, segs, blend_out, hits, warp, combo, cancel_start in attacks:
+        path = out + "Montages/AM_" + prefix + "_" + name
+        seqs = [s for s, _, _ in segs]
+        ranges = [(a, b if b is not None else unreal.load_asset(s).get_play_length()) for s, a, b in segs]
+        m = make_montage(path, seqs, ranges=ranges, blend_out=blend_out)
+        length = m.get_play_length()
+        add_warp(m, warp[0], warp[1])
+        for a, b in hits:
+            add_hit(m, a, b)
+        if combo:
+            add_window(m, combo[0], min(combo[1], length - blend_out), "Window.Combo")
+        add_window(m, cancel_start, length, "Window.Cancel")
+        montages[name] = m
+        saved.append(path)
+    for name, (template, vals) in values.items():
+        path = out + "Data/DA_Attack_" + prefix + "_" + name
+        d = make_data(path, template, vals, montages[name])
+        d.set_editor_property("combo_links", [])
+        data[name] = d
+        saved.append(path)
+    for a, ls in links.items():   # 콤보 분기는 ComboLinks에만 (규칙 4)
+        data[a].set_editor_property("combo_links", [link(t, data[b]) for t, b in ls])
+    save_all(saved)
+    for name, m in montages.items():
+        log("attack", prefix, name, round(m.get_play_length(), 2))
+    return data
+
+
+def pattern(name, start, inputs, weight, min_gap, max_gap, cooldown, tokens):
+    """적 공격 패턴 하나 (7-4): 시작 공격 + 이어 갈 입력 태그 순서"""
+    p = unreal.EnemyAttackPattern()
+    tags = ",".join('(TagName="%s")' % t for t in inputs)
+    p.import_text('(Name="%s",StartAttack="%s",ComboInputs=(%s),Weight=%f,MinGap=%f,MaxGap=%f,RepeatCooldown=%f,TokenCost=%d)'
+                  % (name, start.get_path_name(), tags, weight, min_gap, max_gap, cooldown, tokens))
+    return p

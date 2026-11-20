@@ -14,6 +14,8 @@
 
 class UAnimMontage;
 class UAnimSequenceBase;
+class UPhysicsAsset;
+class USkeletalMesh;
 
 UCLASS()
 class FIRSTACTION_API UFirstActionEditorLibrary : public UBlueprintFunctionLibrary
@@ -43,5 +45,11 @@ public:
 	// 슬롯, 세그먼트, 구간, 길이를 한 줄씩 적은 문자열
 	UFUNCTION(BlueprintCallable, Category = "FirstAction|Editor")
 	static FString DescribeMontage(const UAnimMontage* Montage);
+	// 래그돌용 물리 에셋을 BodyBones에 적힌 뼈에만 캡슐 바디로 만든다 (9-3, Paragon 물리 에셋은 판정용 몇 덩어리뿐).
+	// 목록 밖 뼈 중 비틀림 뼈(이름에 twist)와 손·발·머리 아래 뼈(손가락, 발가락, 얼굴)의 정점은 가장 가까운 목록 조상 바디에 합친다.
+	// 바디마다 가장 가까운 조상 바디와 각도 제한 관절(엔진 기본 한계)로 잇고, 이웃·겹치는 바디끼리 충돌을 끈다 (엔진 자동 생성과 같은 방식).
+	// AssetPath(/Game/...)에 에셋이 있으면 비우고 다시 채운다(참조 유지). 저장은 호출하는 쪽에서
+	UFUNCTION(BlueprintCallable, Category = "FirstAction|Editor")
+	static UPhysicsAsset* CreateRagdollPhysicsAsset(USkeletalMesh* Mesh, const TArray<FName>& BodyBones, const FString& AssetPath);
 #endif
 };

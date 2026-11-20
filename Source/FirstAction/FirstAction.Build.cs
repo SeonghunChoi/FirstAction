@@ -31,6 +31,12 @@ public class FirstAction : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
+		// 에디터 도구 (9-3): 래그돌 물리 에셋 생성(FirstActionEditorLibrary). 게임 빌드에는 넣지 않는다
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[] { "PhysicsUtilities", "MeshUtilitiesEngine", "MeshUtilitiesCommon", "AssetRegistry" });
+		}
+
 		PublicIncludePaths.AddRange(new string[] {
 			"FirstAction",
 			"FirstAction/Variant_Combat",

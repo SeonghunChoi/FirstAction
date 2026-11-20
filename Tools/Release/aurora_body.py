@@ -45,12 +45,6 @@ saved.append(OUT + "Data/DA_Character_Aurora")
 save_all(saved)
 
 # 플레이어 BP: 깃 플레이어 BP의 자식 (입력, 카메라, 락온을 그대로 물려받는다)
-def make_child_bp(path, parent_path):
-    parent = unreal.load_asset(parent_path)
-    factory = unreal.BlueprintFactory()
-    factory.set_editor_property("parent_class", parent.generated_class())
-    return load_or_create(path, unreal.Blueprint, factory)
-
 player = make_child_bp(OUT + "BP_Player_Aurora", GIT_PLAYER_BP)
 cdo = unreal.get_default_object(player.generated_class())
 mesh = cdo.get_editor_property("mesh")
