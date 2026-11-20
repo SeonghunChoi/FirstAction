@@ -129,7 +129,7 @@
 
 1. **`Content/Portfolio/` → `Content/ThirdParty/` 하드 참조 금지.** 깃을 클론한 사람이 그대로 열고 실행할 수 있어야 한다.
 2. `Content/ThirdParty/`는 `.gitignore` 대상이다. 유료 원본, 이를 참조하는 몽타주, Release 콘텐츠 세트가 모두 여기에 있다.
-3. 모든 애니메이션은 **UE5 마네킹 스켈레톤 기준**. 유료 애니메이션은 IK Retargeter로 리타깃한다.
+3. 기본(깃) 애니메이션은 **UE5 마네킹 스켈레톤 기준**. 배포판은 캐릭터별 스켈레톤(플레이어 Greystone, 적 Kwang)이고, 다른 출처 동작은 IK Retargeter로 그 스켈레톤에 리타깃한다 (9-3에서 변경).
 4. **소켓과 노티파이 이름 규약**을 지킨다. 새 이름을 만들면 6.1 표에 추가한다.
 5. 기본 세트의 애니메이션은 **무료이면서 공개 저장소에 원본 재배포가 허용된 것만** 쓴다. 현재는 CC0 에셋(Quaternius UAL2/UAL1 무료판)만 쓰고, 검 메시는 에디터에서 직접 만든 임시 메시를 쓴다. 깃 버전은 기능이 동작하는 것을 보여 주는 수준이고, 자연스러운 동작은 배포 빌드에서 보여 준다. 모든 외부 출처는 `Docs/Credits.md`에 적는다. Fab 무료 에셋, Epic 샘플(GASP, Lyra), Mixamo는 깃에 넣지 않는다.
 6. Release 세트 선택은 `UPortfolioContentSettings`가 하고, 로드 실패 시 Default로 폴백한다.
@@ -147,7 +147,7 @@
 | `_Stagger` 접미사 | 경직 전용 반응 몽타주. 움찔 몽타주를 복제해 `Rate Scale`만 낮춘 것 (`AM_UAL1_Hit_Chest_Stagger`) |
 | `IK_`, `RTG_` 접두사 | IK Rig, IK Retargeter (`IK_UAL2`, `IK_Manny`, `RTG_UAL2_Manny`) |
 | `HandGrip_R` (마네킹 스켈레톤에 원래 있는 소켓) | 검 부착 위치. `weapon_r`은 마네킹에 이미 같은 이름이 있고 손을 따라 움직이지 않아 쓰지 않는다 |
-| `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지 |
+| `blade_start`, `blade_end` (검 메시 소켓) | 판정 스윕 소켓 쌍. 메시를 바꿔도 이름은 유지. 검이 몸 메시 일부인 캐릭터(배포판 Paragon)는 스켈레톤의 검 뼈 아래에 같은 이름으로 둔다 (판정 컴포넌트가 무기 메시 다음에 몸 메시를 찾음) |
 | `AttackTarget` (Motion Warping 목표 이름) | 공격 몽타주의 Motion Warping 구간 `Warp Target Name`. `GA_MeleeAttack`이 구간 시작마다 등록 |
 | `Attack Reach` (`ANS_AttackReach`) | 워핑 구간 시작을 덮게 두는 휘두름별 멈출 간격(`StopGap` cm). 워핑 구간과 같은 몽타주에 둔다 |
 | `Window.Combo`, `Window.Cancel`, `Window.Parry`, `Window.JustDodge`, `State.Invulnerable`, `State.Downed` | `ANS_TagWindow`가 붙이는 태그 (`Window.Parry`는 가드 시작 몽타주 앞부분, `Window.JustDodge`는 회피 몽타주 무적 구간 앞부분, `Window.Cancel`은 공격·회피·움찔 몽타주에서 다른 행동으로 끊을 수 있는 구간, `State.Invulnerable`은 회피 몽타주의 무적 구간, `State.Downed`는 넘어짐 몽타주의 누운 구간) |
@@ -444,8 +444,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 9-2: Asset Manager 등록(C++ 변경 없음). 프로젝트 설정 Primary Asset Types to Scan에 `CombatContentSet`(기본 클래스 `UCombatContentSet`, `/Game/ThirdParty/Data`, 에디터 전용 아님, `AlwaysCook`). `UPrimaryDataAsset`가 C++ 클래스 인스턴스의 ID를 `CombatContentSet:DA_ContentSet_Release`로 스스로 만드는 것을 엔진 소스로 확인. 확인: `AssetManager.DumpTypeSummary`에 `CombatContentSet: Count 1, Paths /Game/ThirdParty/Data`, Play에서 Release 로드 그대로. 실제 쿡 포함은 9-4에서 확인 (2026-11-20)
 
+- [x] Step 9-3 (1/? 설계·판정 소켓): 배포판 구성 결정(범위·배포 맵·Custom Config 타깃·대검·보유 Paragon: 플레이어 Greystone, 적 Kwang·적 전용 데이터·배포 맵 전용 BP·몸 메시 판정 소켓, PLAN 9장). Unity 311개·Fab 라이브러리 조사, Paragon Greystone/Kwang/Aurora를 `ThirdParty/`로. `UMeleeTraceComponent::SetBodyMesh`/`FindBladeMesh`(무기 메시 → 몸 메시 순으로 소켓 쌍), 콘텐츠 세트 누락 경고에서 `/Game/ThirdParty/` 제외, 에셋 규칙 3항을 기본 세트에만 적용. 두 스켈레톤에 `blade_start`/`blade_end`. 확인: 깃 버전 판정 그대로(더미 `thigh_r`), 소켓 저장. 알게 된 것: GASP 애니메이션 FBX 팩은 "프로젝트에 추가"로 넣으면 스켈레톤 없이 임포트돼 전부 실패(수동 임포트 필요), Aurora 샘플 BP 컴파일 오류(쓰지 않음) (2026-11-20)
+
 ### 현재 위치
-- **Step 9-3** 시작 전: 유료 에셋 선정과 리타깃 검증(0-5에서 이연), Release 세트 구성 (`ThirdParty/`)
+- **Step 9-3** 진행 중: 다음은 배포 플레이어 BP(Greystone)로 판정·공격 몽타주 치환 확인. 남은 판단: 빈 동작(구르기, 가드 S/L/E, 누움·일어나기) 채울 출처, 엘리트 외형, 적 넘어짐(Kwang은 누운 동작 없음)
 - 알려진 현상: 점프 중에 맞으면 공중에서 경직 몽타주가 재생된다(공중 피격 반응은 따로 없음). 배포 빌드 후보
 - Step 7 마무리 점검에서 확인됨 (2026-11-19): 머리 몽타주(`AM_UAL1_Hit_Head`, 맞은 본 head), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직·그로기 중 회피 금지(입력은 버퍼로만), 슬로모션 중 히트스톱 겹침(6-13, 히트스톱 뒤 슬로모션 유지. 슬로모션 1.5초가 짧게 느껴짐 → 배포 빌드 튜닝 후보)
 - Step 8에서 다시 확인할 것 (Step 7 마무리에서 사용자 판단으로 이월, 적 2체로 시험하면 쉬움): 누운 구간 반응 없음(6-7), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
@@ -538,6 +540,15 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-20: Release 세트에 짝이 없는 에셋은 기본 에셋을 쓰고 처음 한 번 경고(9-1)
 - 2026-11-20: 배포 몽타주는 기본 몽타주와 구간을 비교해, 빠지면 깨지는 것(태그·판정·워핑·구간 이름·소켓)은 오류, 개수 차이는 경고(9-1)
 - 2026-11-20: 기본 빌드는 깨끗한 클론에서만 만든다(9-2). 콘텐츠 세트는 Asset Manager에 `AlwaysCook`으로 늘 등록하고, 클론에는 ThirdParty가 없어 유료 에셋이 섞이지 않는다
+- 2026-11-20: Release 세트 범위는 애니메이션, 캐릭터·무기 메시, 환경까지(9-3). 환경은 치환 표 밖이라 `ThirdParty/`의 배포 전용 레벨로 한다
+- 2026-11-20: 배포 레벨은 환경과 전투 배치를 함께 담은 맵 통째로 `ThirdParty/Maps/`에 둔다(9-3). 기본 맵과 배치가 따로 논다
+- 2026-11-20: 배포 빌드의 시작 맵은 배포 전용 빌드 타깃(`FirstActionRelease`, `CustomConfig = "Release"`)과 `Config/Custom/Release/DefaultEngine.ini`로 바꾼다(9-3). 게임 코드는 맵을 모른다
+- 2026-11-20: 배포 애니메이션은 대검(9-3). 기본 세트(한손검)와 겉모습이 크게 달라도 데이터는 한 벌이다
+- 2026-11-20: 대검 애니메이션은 두 팩 조합(9-3). 공격·회피·이동은 GameDevHero Great Sword V1, 반응·가드·패리·그로기는 AniBearlee GreatSword Action RPG(UE4 마네킹, 리타깃)
+- 2026-11-20: 배포 캐릭터는 보유 Paragon. 플레이어 Greystone, 적 Kwang(9-3). 깃 버전은 시험용이라 같은 스켈레톤·같은 동작, 배포판은 서로 다른 에셋과 공격 동작. 팩 구매는 빈 곳(구르기, 가드 S/L/E, 누움·일어나기)만 채우는 문제로 다시 정한다
+- 2026-11-20: 배포판 적은 Kwang 동작에 맞춘 전용 공격 데이터·패턴을 쓴다(9-3). 9-1의 "데이터는 한 벌"은 플레이어에만 적용하도록 변경
+- 2026-11-20: 배포판 플레이어·적은 배포 맵에 둔 전용 BP(`ThirdParty/`)로 가른다(9-3). 플레이어 폰은 배포 맵 GameMode 재정의, 콘텐츠 세트는 플레이어 공용 몽타주 치환만
+- 2026-11-20: 몸에 붙은 검은 스켈레톤의 검 뼈 아래 `blade_start`/`blade_end` 소켓으로 판정한다(9-3). 판정 컴포넌트는 무기 메시 → 몸 메시 순으로 소켓 쌍을 찾는다. 이에 따라 에셋 규칙 3항(마네킹 기준)을 기본 세트에만 적용하도록 변경
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

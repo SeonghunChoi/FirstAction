@@ -54,6 +54,12 @@ void UCombatContentSubsystem::WarnMissing(const UObject* DefaultAsset, const TCH
 	{
 		return;
 	}
+	// 배포 전용 에셋(배포 BP의 Kwang 데이터가 직접 가리키는 몽타주, Greystone 메시 등)은 치환 대상이 아니다 (9-3)
+	// 경고는 깃에 있는 기본 에셋이 표에서 빠졌을 때만 남긴다
+	if (DefaultAsset->GetPathName().StartsWith(TEXT("/Game/ThirdParty/")))
+	{
+		return;
+	}
 	bool bAlreadyWarned = false;
 	WarnedAssets.Add(FObjectKey(DefaultAsset), &bAlreadyWarned);
 	if (!bAlreadyWarned)

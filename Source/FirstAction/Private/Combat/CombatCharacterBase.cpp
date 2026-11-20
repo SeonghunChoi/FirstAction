@@ -598,6 +598,8 @@ void ACombatCharacterBase::BeginPlay()
 	GetCharacterMovement()->ProcessRootMotionPostConvertToWorld.BindUObject(this, &ACombatCharacterBase::ProcessHitDisplacementRootMotion);
 
 	MeleeTrace->SetWeaponMesh(WeaponMesh);
+	// 검이 몸 메시 일부인 캐릭터(배포판 Greystone, Kwang)는 스켈레톤의 판정 소켓을 쓴다 (9-3)
+	MeleeTrace->SetBodyMesh(GetMesh());
 	MeleeTrace->OnHit.AddUObject(this, &ACombatCharacterBase::HandleMeleeTraceHit);
 
 	// 맞은 쪽 히트스톱 통로. 어빌리티 없이 이벤트 태그 하나만 듣는다 (정확히 이 태그일 때만 불린다)

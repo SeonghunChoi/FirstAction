@@ -24,6 +24,9 @@ public:
 	// 판정 소켓을 가진 무기 메시. 기반 캐릭터가 BeginPlay에서 지정한다
 	void SetWeaponMesh(UMeshComponent* InWeaponMesh);
 
+	// 검이 몸 메시에 붙어 있는 캐릭터(배포판 Paragon)용 대체 메시. 무기 메시에 판정 소켓이 없으면 여기서 찾는다 (9-3)
+	void SetBodyMesh(UMeshComponent* InBodyMesh);
+
 	// 한 번의 휘두름 판정 시작: 맞은 대상 목록을 비우고 현재 칼날 위치를 기준점으로 기록한다
 	void BeginTrace();
 
@@ -56,7 +59,11 @@ private:
 	// 칼날 위의 점들을 지금 소켓 위치로 계산한다. 소켓이 없으면 false
 	bool ComputeBladeSamples(TArray<FVector>& OutPoints) const;
 
+	// 판정 소켓 쌍을 모두 가진 메시: 무기 메시 우선, 없으면 몸 메시. 둘 다 없으면 nullptr
+	const UMeshComponent* FindBladeMesh() const;
+
 	TWeakObjectPtr<UMeshComponent> WeaponMesh;
+	TWeakObjectPtr<UMeshComponent> BodyMesh;
 
 	// 이전 프레임의 칼날 점들. 이번 프레임 점까지 스윕하는 시작점
 	TArray<FVector> PreviousSamples;

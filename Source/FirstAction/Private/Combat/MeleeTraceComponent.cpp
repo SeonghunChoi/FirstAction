@@ -31,10 +31,30 @@ void UMeleeTraceComponent::SetWeaponMesh(UMeshComponent* InWeaponMesh)
 	WeaponMesh = InWeaponMesh;
 }
 
+void UMeleeTraceComponent::SetBodyMesh(UMeshComponent* InBodyMesh)
+{
+	BodyMesh = InBodyMesh;
+}
+
+const UMeshComponent* UMeleeTraceComponent::FindBladeMesh() const
+{
+	// 무기 메시가 먼저: 깃 버전처럼 손에 검을 붙이는 캐릭터
+	// 그다음 몸 메시: 검이 몸 메시 일부인 캐릭터. 소켓은 스켈레톤의 검 뼈 아래에 둔다 (9-3 결정 A)
+	for (const TWeakObjectPtr<UMeshComponent>& Candidate : { WeaponMesh, BodyMesh })
+	{
+		const UMeshComponent* Mesh = Candidate.Get();
+		if (Mesh && Mesh->DoesSocketExist(BladeStartSocket) && Mesh->DoesSocketExist(BladeEndSocket))
+		{
+			return Mesh;
+		}
+	}
+	return nullptr;
+}
+
 bool UMeleeTraceComponent::ComputeBladeSamples(TArray<FVector>& OutPoints) const
 {
-	const UMeshComponent* Mesh = WeaponMesh.Get();
-	if (!Mesh || !Mesh->DoesSocketExist(BladeStartSocket) || !Mesh->DoesSocketExist(BladeEndSocket))
+	const UMeshComponent* Mesh = FindBladeMesh();
+	if (!Mesh)
 	{
 		return false;
 	}
@@ -61,7 +81,7 @@ void UMeleeTraceComponent::BeginTrace()
 	if (!ComputeBladeSamples(PreviousSamples))
 	{
 		// 무기가 없는 캐릭터(더미 등)는 판정하지 않는다
-		UE_LOG(LogFirstAction, Verbose, TEXT("[%s] MeleeTrace: 무기 메시나 판정 소켓이 없어 판정하지 않습니다"), *GetNameSafe(GetOwner()));
+		UE_LOG(LogFirstAction, Verbose, TEXT("[%s] MeleeTrace: 무기 메시와 몸 메시 모두 판정 소켓이 없어 판정하지 않습니다"), *GetNameSafe(GetOwner()));
 		return;
 	}
 
