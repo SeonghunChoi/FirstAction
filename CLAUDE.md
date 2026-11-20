@@ -442,8 +442,10 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 9-1: 콘텐츠 세트. `UCombatContentSet`(치환 표: 몽타주, 애님 BP, 스켈레탈 메시, 스태틱 메시. 짝 비교 검증과 짝 없는 기본 몽타주 목록), `UPortfolioContentSettings`(프로젝트 설정 "Portfolio Content": `ReleaseContentSet` 소프트 참조, `bUseReleaseContentSet`), `UCombatContentSubsystem`(게임 인스턴스 서브시스템, 시작할 때 Release 로드·실패 시 Default, `ResolveMontage` 등, 짝 없는 에셋 처음 한 번 경고). 몽타주 재생 5곳(공격·회피·가드·반응·사망)과 `ACombatCharacterBase::ApplyContentSet`(BeginPlay 맨 앞, 몸·무기 메시와 애님 BP)이 치환을 거친다. 검증 도구에 개수 세기 함수 추가. 시험용 `ThirdParty/Data/DA_ContentSet_Release`(짝 1개 `AM_Test_Regular_A`). 확인: Release 로드와 약1 치환, 짝 없는 에셋 경고(몽타주·메시·무기·애님 BP), 세트 검증 경고 14/15, `Window.Combo`를 지운 짝의 오류, 설정에서 끄기, ThirdParty 폴더를 치운 상태의 폴백 경고 (2026-11-20)
 
+- [x] Step 9-2: Asset Manager 등록(C++ 변경 없음). 프로젝트 설정 Primary Asset Types to Scan에 `CombatContentSet`(기본 클래스 `UCombatContentSet`, `/Game/ThirdParty/Data`, 에디터 전용 아님, `AlwaysCook`). `UPrimaryDataAsset`가 C++ 클래스 인스턴스의 ID를 `CombatContentSet:DA_ContentSet_Release`로 스스로 만드는 것을 엔진 소스로 확인. 확인: `AssetManager.DumpTypeSummary`에 `CombatContentSet: Count 1, Paths /Game/ThirdParty/Data`, Play에서 Release 로드 그대로. 실제 쿡 포함은 9-4에서 확인 (2026-11-20)
+
 ### 현재 위치
-- **Step 9-2** 시작 전: Asset Manager 기본 에셋 타입 등록 (Release 세트가 쿡에 들어가게)
+- **Step 9-3** 시작 전: 유료 에셋 선정과 리타깃 검증(0-5에서 이연), Release 세트 구성 (`ThirdParty/`)
 - 알려진 현상: 점프 중에 맞으면 공중에서 경직 몽타주가 재생된다(공중 피격 반응은 따로 없음). 배포 빌드 후보
 - Step 7 마무리 점검에서 확인됨 (2026-11-19): 머리 몽타주(`AM_UAL1_Hit_Head`, 맞은 본 head), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직·그로기 중 회피 금지(입력은 버퍼로만), 슬로모션 중 히트스톱 겹침(6-13, 히트스톱 뒤 슬로모션 유지. 슬로모션 1.5초가 짧게 느껴짐 → 배포 빌드 튜닝 후보)
 - Step 8에서 다시 확인할 것 (Step 7 마무리에서 사용자 판단으로 이월, 적 2체로 시험하면 쉬움): 누운 구간 반응 없음(6-7), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
@@ -535,6 +537,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-20: 콘텐츠 세트는 몽타주·메시 치환 표, 데이터는 한 벌(9-1). Default 세트는 따로 없고 치환 없음이 Default
 - 2026-11-20: Release 세트에 짝이 없는 에셋은 기본 에셋을 쓰고 처음 한 번 경고(9-1)
 - 2026-11-20: 배포 몽타주는 기본 몽타주와 구간을 비교해, 빠지면 깨지는 것(태그·판정·워핑·구간 이름·소켓)은 오류, 개수 차이는 경고(9-1)
+- 2026-11-20: 기본 빌드는 깨끗한 클론에서만 만든다(9-2). 콘텐츠 세트는 Asset Manager에 `AlwaysCook`으로 늘 등록하고, 클론에는 ThirdParty가 없어 유료 에셋이 섞이지 않는다
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지
