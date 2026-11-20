@@ -52,6 +52,9 @@
   - Python 원격 실행: 엔진 내장 PythonScriptPlugin의 Remote Execution(로컬 `127.0.0.1`만). 설정은 `Saved/Config/WindowsEditor/Engine.ini`(git 제외). 클라이언트는 엔진 `remote_execution.py`
   - 그래프 덤프: `FirstAction.DumpBlueprintGraph <에셋 경로>` → `Saved/GraphDumps/<이름>.txt` (블루프린트·애님 BP의 모든 그래프, 노드 속성, 핀 연결, 변수)
   - 노드 삭제: `FirstAction.RemoveBlueprintNodes <에셋 경로> <노드 이름...>` (덤프의 노드 이름. 컴파일·저장은 Python)
+  - 몽타주 편집: `unreal.FirstActionEditorLibrary`(`set_montage_slot`, `set_montage_segments`, `set_montage_sections`, `describe_montage`). 노티파이·커브는 엔진 `AnimationLibrary`
+  - 배포판 생성 스크립트: `Tools/Release/common.py` + 캐릭터별 스크립트(`aurora.py` 공격, `aurora_body.py` 반응·데이터·BP·GameMode). 다시 돌려도 같은 결과가 나오게 지우고 새로 만든다
+  - 배포 맵은 파일 단위 액터 저장이라 액터가 `Content/__ExternalActors__/ThirdParty/`에 생긴다. `.gitignore` 대상
   - 빌드: 에디터를 닫아야 할 때 Claude가 원격으로 저장 여부를 확인하고 `quit_editor`로 닫은 뒤 명령줄(`Build.bat`)로 빌드하고 다시 연다 (사용자 허락, 2026-11-20)
 
 ---
@@ -141,7 +144,7 @@
 
 1. **`Content/Portfolio/` → `Content/ThirdParty/` 하드 참조 금지.** 깃을 클론한 사람이 그대로 열고 실행할 수 있어야 한다.
 2. `Content/ThirdParty/`는 `.gitignore` 대상이다. 유료 원본, 이를 참조하는 몽타주, Release 콘텐츠 세트가 모두 여기에 있다.
-3. 기본(깃) 애니메이션은 **UE5 마네킹 스켈레톤 기준**. 배포판은 캐릭터별 스켈레톤(플레이어 Greystone, 적 Kwang)이고, 다른 출처 동작은 IK Retargeter로 그 스켈레톤에 리타깃한다 (9-3에서 변경).
+3. 기본(깃) 애니메이션은 **UE5 마네킹 스켈레톤 기준**. 배포판은 캐릭터별 스켈레톤(플레이어 Aurora, 엘리트 Greystone, 일반 적 Kwang)이고, 다른 출처 동작은 IK Retargeter로 그 스켈레톤에 리타깃한다 (9-3에서 변경).
 4. **소켓과 노티파이 이름 규약**을 지킨다. 새 이름을 만들면 6.1 표에 추가한다.
 5. 기본 세트의 애니메이션은 **무료이면서 공개 저장소에 원본 재배포가 허용된 것만** 쓴다. 현재는 CC0 에셋(Quaternius UAL2/UAL1 무료판)만 쓰고, 검 메시는 에디터에서 직접 만든 임시 메시를 쓴다. 깃 버전은 기능이 동작하는 것을 보여 주는 수준이고, 자연스러운 동작은 배포 빌드에서 보여 준다. 모든 외부 출처는 `Docs/Credits.md`에 적는다. Fab 무료 에셋, Epic 샘플(GASP, Lyra), Mixamo는 깃에 넣지 않는다.
 6. Release 세트 선택은 `UPortfolioContentSettings`가 하고, 로드 실패 시 Default로 폴백한다.
@@ -459,7 +462,7 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - [x] Step 9-3 (1/? 설계·판정 소켓): 배포판 구성 결정(범위·배포 맵·Custom Config 타깃·대검·보유 Paragon: 플레이어 Greystone, 적 Kwang·적 전용 데이터·배포 맵 전용 BP·몸 메시 판정 소켓, PLAN 9장). Unity 311개·Fab 라이브러리 조사, Paragon Greystone/Kwang/Aurora를 `ThirdParty/`로. `UMeleeTraceComponent::SetBodyMesh`/`FindBladeMesh`(무기 메시 → 몸 메시 순으로 소켓 쌍), 콘텐츠 세트 누락 경고에서 `/Game/ThirdParty/` 제외, 에셋 규칙 3항을 기본 세트에만 적용. 두 스켈레톤에 `blade_start`/`blade_end`. 확인: 깃 버전 판정 그대로(더미 `thigh_r`), 소켓 저장. 알게 된 것: GASP 애니메이션 FBX 팩은 "프로젝트에 추가"로 넣으면 스켈레톤 없이 임포트돼 전부 실패(수동 임포트 필요), Aurora 샘플 BP 컴파일 오류(쓰지 않음) (2026-11-20)
 
 ### 현재 위치
-- **Step 9-3** 진행 중: `ABP_Greystone`(Paragon 애님 BP 복제) 정리 완료(등장 몽타주·Paragon 캐릭터 캐스트 20노드 삭제, 변수 9개). 다음은 배포 플레이어 BP(Greystone)와 공격 몽타주(`UpperBody` 슬롯, `FullBody` 커브)로 판정·치환 확인. 남은 판단: 빈 동작(구르기, 가드 S/L/E, 누움·일어나기) 채울 출처, 엘리트 외형, 적 넘어짐(Kwang은 누운 동작 없음)
+- **Step 9-3** 진행 중: Aurora 플레이어 2차(사용자 콤보표: 약 Fast_A→B→C→D, C→강 Slow_D, D→강 Ability_E, 강 단독 Primary_B→C→Slow_D, 돌진 후보 Ability_Q). 제자리 몽타주 접근 이동(`GA_MeleeAttack::ScheduleApproaches`/`StartApproach`, 워핑 구간 동안 Root Motion Source). 시험: 판정 구간 152개 중 131개 명중(86%), 접근 평균 28~125cm. 애님 BP 3종 정리, 행동 중 이동 입력 차단(`MovementBlockedTags`), Paragon 샘플 BP 오류 노드 정리. 다음: GASP 회피 옆걸음 리타깃 → Kwang·Greystone 적 → 환경 맵
 - 알려진 현상: 점프 중에 맞으면 공중에서 경직 몽타주가 재생된다(공중 피격 반응은 따로 없음). 배포 빌드 후보
 - Step 7 마무리 점검에서 확인됨 (2026-11-19): 머리 몽타주(`AM_UAL1_Hit_Head`, 맞은 본 head), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직·그로기 중 회피 금지(입력은 버퍼로만), 슬로모션 중 히트스톱 겹침(6-13, 히트스톱 뒤 슬로모션 유지. 슬로모션 1.5초가 짧게 느껴짐 → 배포 빌드 튜닝 후보)
 - Step 8에서 다시 확인할 것 (Step 7 마무리에서 사용자 판단으로 이월, 적 2체로 시험하면 쉬움): 누운 구간 반응 없음(6-7), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
@@ -563,6 +566,14 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-20: 몸에 붙은 검은 스켈레톤의 검 뼈 아래 `blade_start`/`blade_end` 소켓으로 판정한다(9-3). 판정 컴포넌트는 무기 메시 → 몸 메시 순으로 소켓 쌍을 찾는다. 이에 따라 에셋 규칙 3항(마네킹 기준)을 기본 세트에만 적용하도록 변경
 - 2026-11-20: 배포판 애님 BP는 Paragon 애님 BP를 복제해 고친다(9-3). 캐스트와 슬롯을 우리 캐릭터·몽타주에 맞추고, 입력 반응은 시험으로 확인
 - 2026-11-20: 배포판은 튜토리얼 방식 대신 AI를 최대한 활용해 빠르게 높은 품질로 만든다. 배포판 에디터 작업은 Claude가 Python 원격 실행으로 하고, 그래프 확인은 덤프 명령으로 한다(CLAUDE.md 2.4)
+- 2026-11-20: **결정 변경** 배포판 캐릭터는 플레이어 Aurora, 엘리트 Greystone(방패), 일반 적 Kwang(9-3)
+- 2026-11-20: 배포판 공격은 플레이어·적 모두 애니메이션에 맞춘 전용 콤보·데이터로 만든다. 깃 버전 구조에 맞추지 않는다(9-3)
+- 2026-11-20: **변경** 제자리 공격의 접근은 코드로 보완(9-3 시험 후): 루트 모션 없는 몽타주는 워핑 구간 동안 Root Motion Source로 대상 쪽에 옮긴다. 미끄러짐보다 이동 손맛을 택함
+- 2026-11-20: (처음 결정) 배포판은 이동 후 공격(9-3). Paragon 공격이 모두 제자리 동작이고 GASP에는 무기 공격이 없어, 워핑은 방향만 맞추고 적은 공격 거리까지 걸어 들어간다
+- 2026-11-20: 배포판 Aurora는 가드·패리 없이 회피(GASP 옆걸음 리타깃)·저스트 회피만(9-3). 방어 3종 비교는 깃 버전에서
+- 2026-11-20: **변경** Aurora 콤보는 사용자 콤보표(9-3 시험 후): 약 Fast_A→B→C→D, C에서 강→Slow_D, D에서 강→Ability_E, 강 단독 Primary_B→C→Slow_D. Ability_Q는 돌진 기술 후보
+- 2026-11-20: (처음 안) Aurora 콤보는 빠른 연타형(9-3). 약 Fast_A→B→C→D, 약 중 강은 Ability_Q(Ability_R은 칼이 머리 위로 돌아 맞지 않아 시험 후 교체), 강 단독은 Ability_E
+- 2026-11-20: 적 콤보(9-3). Kwang Combo3·Combo4·Flurry, Greystone QuickJab·HeavyCombo·Slam·Mix (PLAN 9장)
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

@@ -19,6 +19,10 @@
 #include "RootMotionModifier.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Combat/Animation/ANS_AttackReach.h"
+#include "AnimNotifyState_MotionWarping.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/RootMotionSource.h"
+#include "TimerManager.h"
 
 namespace
 {
@@ -168,12 +172,23 @@ void UGA_MeleeAttack::PlayCurrentAttackMontage()
 	MontageTask->OnInterrupted.AddDynamic(this, &UGA_MeleeAttack::OnMontageCancelled);
 	MontageTask->OnCancelled.AddDynamic(this, &UGA_MeleeAttack::OnMontageCancelled);
 	MontageTask->ReadyForActivation();
+
+	// 제자리 동작(루트 모션 없음)이면 워핑 구간 동안 직접 옮긴다 (9-3)
+	ClearApproaches();
+	if (Montage && !Montage->HasRootMotion())
+	{
+		ScheduleApproaches(Montage);
+	}
 }
 
 float UGA_MeleeAttack::FindStopGap(const URootMotionModifier* Modifier)
 {
+	return Modifier ? FindStopGapAt(Modifier->Animation.Get(), Modifier->StartTime) : 0.f;
+}
+
+float UGA_MeleeAttack::FindStopGapAt(const UAnimSequenceBase* Animation, float StartTime)
+{
 	// 워핑 구간이 시작되는 시점을 덮는 Attack Reach 노티파이를 같은 애니메이션(몽타주)에서 찾는다
-	const UAnimSequenceBase* Animation = Modifier ? Modifier->Animation.Get() : nullptr;
 	if (!Animation)
 	{
 		return 0.f;
@@ -182,13 +197,155 @@ float UGA_MeleeAttack::FindStopGap(const URootMotionModifier* Modifier)
 	for (const FAnimNotifyEvent& Event : Animation->Notifies)
 	{
 		const UANS_AttackReach* Reach = Cast<UANS_AttackReach>(Event.NotifyStateClass);
-		if (Reach && Event.GetTriggerTime() <= Modifier->StartTime + KINDA_SMALL_NUMBER
-			&& Modifier->StartTime < Event.GetEndTriggerTime())
+		if (Reach && Event.GetTriggerTime() <= StartTime + KINDA_SMALL_NUMBER && StartTime < Event.GetEndTriggerTime())
 		{
 			return Reach->StopGap;
 		}
 	}
 	return 0.f;
+}
+
+bool UGA_MeleeAttack::ComputeWarpGoal(float StopGap, FVector& OutLocation, FVector& OutDirection, float& OutMoveDistance, AActor*& OutTarget) const
+{
+	ACombatCharacterBase* Character = GetCombatCharacter();
+	if (!Character || !CurrentAttack)
+	{
+		return false;
+	}
+
+	const float MaxWarpDistance = CurrentAttack->MaxWarpDistance;
+	OutTarget = MaxWarpDistance > 0.f ? Character->FindAttackTarget(MaxWarpDistance) : nullptr;
+	if (!OutTarget)
+	{
+		return false;
+	}
+
+	const FVector From = Character->GetActorLocation();
+	const FVector ToTarget = (OutTarget->GetActorLocation() - From) * FVector(1.f, 1.f, 0.f);
+	OutDirection = ToTarget.GetSafeNormal();
+	if (OutDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	// 몸 간격이 StopGap이 되는 곳까지만, 그리고 최대 거리까지만 (6-2 결정 + 휘두름별 멈출 간격)
+	// StopGap은 몽타주의 Attack Reach 노티파이 값, 없으면 0(몸이 닿는 거리). 이미 그보다 가까우면 이동 0, 방향만 돌린다
+	const float ContactSpacing = Character->GetSimpleCollisionRadius() + OutTarget->GetSimpleCollisionRadius();
+	OutMoveDistance = FMath::Clamp(ToTarget.Size() - ContactSpacing - StopGap, 0.f, MaxWarpDistance);
+	OutLocation = From + OutDirection * OutMoveDistance;
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s → %s (간격 %.0f, 멈출 간격 %.0f, 이동 %.0f / 최대 %.0f)"),
+		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), *GetNameSafe(OutTarget),
+		ToTarget.Size() - ContactSpacing, StopGap, OutMoveDistance, MaxWarpDistance);
+
+	if (CVarShowWarpTarget.GetValueOnGameThread())
+	{
+		UWorld* World = Character->GetWorld();
+		DrawDebugLine(World, From, OutTarget->GetActorLocation(), FColor::Orange, false, 1.5f, 0, 1.5f);
+		DrawDebugSphere(World, OutLocation, 15.f, 12, FColor::Green, false, 1.5f);
+		DrawDebugDirectionalArrow(World, OutLocation, OutLocation + OutDirection * 60.f, 20.f, FColor::Green, false, 1.5f, 0, 2.f);
+	}
+	return true;
+}
+
+void UGA_MeleeAttack::ScheduleApproaches(const UAnimMontage* Montage)
+{
+	ACombatCharacterBase* Character = GetCombatCharacter();
+	UWorld* World = Character ? Character->GetWorld() : nullptr;
+	if (!World)
+	{
+		return;
+	}
+
+	// 몽타주의 Motion Warping 구간(이 공격의 목표 이름)을 그대로 접근 구간으로 쓴다. 타이밍은 애니메이션에 (규칙 3)
+	const float Rate = FMath::Max(Montage->RateScale, KINDA_SMALL_NUMBER);
+	for (const FAnimNotifyEvent& Event : Montage->Notifies)
+	{
+		const UAnimNotifyState_MotionWarping* Warping = Cast<UAnimNotifyState_MotionWarping>(Event.NotifyStateClass);
+		const URootMotionModifier_Warp* Warp = Warping ? Cast<URootMotionModifier_Warp>(Warping->RootMotionModifier) : nullptr;
+		if (!Warp || Warp->WarpTargetName != WarpTargetName)
+		{
+			continue;
+		}
+
+		const float StartTime = Event.GetTriggerTime();
+		const float StopGap = FindStopGapAt(Montage, StartTime);
+		const float Duration = Event.GetDuration() / Rate;
+		if (StartTime <= KINDA_SMALL_NUMBER)
+		{
+			StartApproach(StopGap, Duration);
+			continue;
+		}
+
+		FTimerHandle& Handle = ApproachTimers.AddDefaulted_GetRef();
+		World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [this, StopGap, Duration]()
+		{
+			if (IsActive())
+			{
+				StartApproach(StopGap, Duration);
+			}
+		}), StartTime / Rate, false);
+	}
+}
+
+void UGA_MeleeAttack::StartApproach(float StopGap, float Duration)
+{
+	ACombatCharacterBase* Character = GetCombatCharacter();
+	UCharacterMovementComponent* Movement = Character ? Character->GetCharacterMovement() : nullptr;
+	if (!Movement)
+	{
+		return;
+	}
+
+	static const FName ApproachSourceName(TEXT("AttackApproach"));
+	Movement->RemoveRootMotionSource(ApproachSourceName);
+
+	FVector Goal;
+	FVector Direction;
+	float MoveDistance = 0.f;
+	AActor* Target = nullptr;
+	if (!ComputeWarpGoal(StopGap, Goal, Direction, MoveDistance, Target))
+	{
+		return;
+	}
+
+	// 방향은 바로 돌린다 (워핑의 회전과 같은 역할)
+	Character->SetActorRotation(FRotator(0.f, Direction.Rotation().Yaw, 0.f));
+	if (MoveDistance < 1.f)
+	{
+		return;
+	}
+
+	TSharedPtr<FRootMotionSource_MoveToForce> Source = MakeShared<FRootMotionSource_MoveToForce>();
+	Source->InstanceName = ApproachSourceName;
+	Source->AccumulateMode = ERootMotionAccumulateMode::Override;
+	Source->Priority = 4;
+	Source->StartLocation = Character->GetActorLocation();
+	Source->TargetLocation = FVector(Goal.X, Goal.Y, Source->StartLocation.Z);
+	Source->Duration = FMath::Max(Duration, 0.05f);
+	Source->bRestrictSpeedToExpected = true;
+	// 도착하면 멈춘다. 기본값(마지막 속도 유지)이면 휘두르는 동안 계속 미끄러진다
+	Source->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
+	Source->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
+	Movement->ApplyRootMotionSource(Source);
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 접근: %s %.0fcm / %.2f초 (제자리 동작, Root Motion Source)"),
+		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), MoveDistance, Source->Duration);
+}
+
+void UGA_MeleeAttack::ClearApproaches()
+{
+	if (ACombatCharacterBase* Character = GetCombatCharacter())
+	{
+		if (UWorld* World = Character->GetWorld())
+		{
+			for (FTimerHandle& Handle : ApproachTimers)
+			{
+				World->GetTimerManager().ClearTimer(Handle);
+			}
+		}
+	}
+	ApproachTimers.Reset();
 }
 
 void UGA_MeleeAttack::UpdateWarpTarget(float StopGap)
@@ -203,41 +360,16 @@ void UGA_MeleeAttack::UpdateWarpTarget(float StopGap)
 	// 이전 타의 목표가 남지 않도록 먼저 지운다. 목표가 없으면 Motion Warping 구간은 아무것도 고치지 않는다
 	MotionWarping->RemoveWarpTarget(WarpTargetName);
 
-	const float MaxWarpDistance = CurrentAttack->MaxWarpDistance;
-	AActor* Target = MaxWarpDistance > 0.f ? Character->FindAttackTarget(MaxWarpDistance) : nullptr;
-	if (!Target)
+	FVector WarpLocation;
+	FVector Direction;
+	float MoveDistance = 0.f;
+	AActor* Target = nullptr;
+	if (!ComputeWarpGoal(StopGap, WarpLocation, Direction, MoveDistance, Target))
 	{
 		UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s 대상 없음 (원래 루트 모션)"), *GetNameSafe(Character), *GetNameSafe(CurrentAttack));
 		return;
 	}
-
-	const FVector From = Character->GetActorLocation();
-	const FVector ToTarget = (Target->GetActorLocation() - From) * FVector(1.f, 1.f, 0.f);
-	const FVector Direction = ToTarget.GetSafeNormal();
-	if (Direction.IsNearlyZero())
-	{
-		return;
-	}
-
-	// 몸 간격이 StopGap이 되는 곳까지만, 그리고 최대 거리까지만 (6-2 결정 + 휘두름별 멈출 간격)
-	// StopGap은 몽타주의 Attack Reach 노티파이 값, 없으면 0(몸이 닿는 거리). 이미 그보다 가까우면 이동 0, 방향만 돌린다
-	const float ContactSpacing = Character->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius();
-	const float MoveDistance = FMath::Clamp(ToTarget.Size() - ContactSpacing - StopGap, 0.f, MaxWarpDistance);
-	const FVector WarpLocation = From + Direction * MoveDistance;
-
 	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(WarpTargetName, WarpLocation, Direction.Rotation());
-
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s → %s (간격 %.0f, 멈출 간격 %.0f, 이동 %.0f / 최대 %.0f)"),
-		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), *GetNameSafe(Target),
-		ToTarget.Size() - ContactSpacing, StopGap, MoveDistance, MaxWarpDistance);
-
-	if (CVarShowWarpTarget.GetValueOnGameThread())
-	{
-		UWorld* World = Character->GetWorld();
-		DrawDebugLine(World, From, Target->GetActorLocation(), FColor::Orange, false, 1.5f, 0, 1.5f);
-		DrawDebugSphere(World, WarpLocation, 15.f, 12, FColor::Green, false, 1.5f);
-		DrawDebugDirectionalArrow(World, WarpLocation, WarpLocation + Direction * 60.f, 20.f, FColor::Green, false, 1.5f, 0, 2.f);
-	}
 }
 
 void UGA_MeleeAttack::OnMotionWarpingPreUpdate(UMotionWarpingComponent* MotionWarpingComp)
@@ -524,6 +656,7 @@ void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
 		}
 	}
 	RefreshedWarpModifiers.Reset();
+	ClearApproaches();
 
 	CurrentAttack = nullptr;
 	MontageTask = nullptr;

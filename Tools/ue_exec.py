@@ -54,6 +54,12 @@ def main():
     else:
         parser.error("파일, -c, --console 중 하나가 필요합니다")
 
+    # ExecuteFile 모드는 명령 안에 ".py"가 있으면 그 앞까지를 파일 경로로 해석한다.
+    # 코드를 base64로 감싸 그대로 실행한다 (base64 문자에는 "."이 없다)
+    import base64
+    encoded = base64.b64encode(("import unreal\n" + code).encode("utf-8")).decode("ascii")
+    code = "import base64\nexec(compile(base64.b64decode('%s').decode('utf-8'), 'remote', 'exec'))\n" % encoded
+
     remote = remote_execution.RemoteExecution()
     remote.start()
     try:

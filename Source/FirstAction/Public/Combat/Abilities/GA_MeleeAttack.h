@@ -21,6 +21,8 @@ struct FHitResolution;
 struct FGameplayEffectSpecHandle;
 class UAbilitySystemComponent;
 class URootMotionModifier;
+class UAnimMontage;
+class UAnimSequenceBase;
 struct FGameplayEventData;
 
 UCLASS()
@@ -78,8 +80,21 @@ private:
 	// 대상이 없으면 목표를 지워 원래 루트 모션대로 휘두른다
 	void UpdateWarpTarget(float StopGap);
 
+	// 워핑 목표 계산 (UpdateWarpTarget과 제자리 동작 접근이 함께 쓴다). 대상이 없으면 false
+	// OutLocation: 몸 간격이 StopGap이 되는 위치(최대 MaxWarpDistance), OutDirection: 대상 쪽 수평 방향
+	bool ComputeWarpGoal(float StopGap, FVector& OutLocation, FVector& OutDirection, float& OutMoveDistance, AActor*& OutTarget) const;
+
 	// 이 워핑 구간이 시작되는 시점을 덮는 Attack Reach 노티파이의 멈출 간격. 없으면 0 (휘두름별 칼이 닿는 거리)
 	static float FindStopGap(const URootMotionModifier* Modifier);
+	static float FindStopGapAt(const UAnimSequenceBase* Animation, float StartTime);
+
+	// 루트 모션이 없는 몽타주(배포판 Paragon 제자리 동작)의 접근 (9-3).
+	// Motion Warping은 애니메이션 루트 이동을 늘리고 줄이는 방식이라 제자리 동작에서는 움직이지 않는다.
+	// 그래서 같은 워핑 구간(시간)과 같은 목표 계산으로, 구간 동안 Root Motion Source로 대상 쪽에 옮긴다
+	void ScheduleApproaches(const UAnimMontage* Montage);
+	void StartApproach(float StopGap, float Duration);
+	void ClearApproaches();
+	TArray<FTimerHandle> ApproachTimers;
 
 	// Motion Warping 구간이 시작될 때마다 대상을 다시 묻는다 (6-6에서 발견한 문제의 수정)
 	// 엔진이 새 구간의 수정자(modifier)를 만든 직후, 활성화하기 직전에 불린다. 한 몽타주에 여러 번 휘두르는 공격(Heavy_Combo)도 휘두름마다 새 목표를 쓴다

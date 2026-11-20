@@ -48,6 +48,15 @@ ACombatCharacterBase::ACombatCharacterBase()
 
 	PhysicalAnimation = CreateDefaultSubobject<UPhysicalAnimationComponent>(TEXT("PhysicalAnimation"));
 	PartialHitReaction = CreateDefaultSubobject<UPartialHitReactionComponent>(TEXT("PartialHitReaction"));
+
+	// 행동 중 이동 입력 차단 기본값 (9-3). 가드는 위에서 따로 처리(제자리 회전), 공중(InAir)은 공중 제어를 남긴다
+	MovementBlockedTags.AddTag(CombatTags::State_Attacking);
+	MovementBlockedTags.AddTag(CombatTags::State_Dodging);
+	MovementBlockedTags.AddTag(CombatTags::State_Flinching);
+	MovementBlockedTags.AddTag(CombatTags::State_Staggered);
+	MovementBlockedTags.AddTag(CombatTags::State_Downed);
+	MovementBlockedTags.AddTag(CombatTags::State_Groggy);
+	MovementBlockedTags.AddTag(CombatTags::State_Dead);
 }
 
 FVector ACombatCharacterBase::GetAttackTargetDirection() const
@@ -453,6 +462,11 @@ void ACombatCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleV
 	{
 		// 가드 중: 이동하지 않고 방향만 모은다. Tick에서 돈다 (6-11 결정)
 		GuardTurnInput += WorldDirection * ScaleValue;
+		return;
+	}
+	if (AbilitySystemComponent && AbilitySystemComponent->HasAnyMatchingGameplayTags(MovementBlockedTags))
+	{
+		// 공격·회피·반응 중: 동작이 끝나거나 캔슬될 때까지 이동하지 않는다 (9-3)
 		return;
 	}
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);

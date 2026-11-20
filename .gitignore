@@ -31,3 +31,7 @@ Content/Developers/
 # 깃을 클론한 사람은 이 폴더 없이 기본 세트로 실행된다
 # ---------------------------------------------
 Content/ThirdParty/
+
+# ThirdParty 맵(파일 단위 액터 저장)의 액터·오브젝트 파일. 맵 자체는 ThirdParty/에 있고 액터만 여기에 저장된다 (9-3)
+Content/__ExternalActors__/ThirdParty/
+Content/__ExternalObjects__/ThirdParty/

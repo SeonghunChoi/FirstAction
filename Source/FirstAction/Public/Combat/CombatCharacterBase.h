@@ -213,6 +213,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0", Units = "DegreesPerSecond"))
 	float GuardTurnRate = 0.f;
 
+	// 이 상태 태그 중 하나라도 있으면 이동 입력을 받지 않는다 (9-3).
+	// 배포판 Paragon 공격·반응은 제자리 동작이라, 입력을 받으면 동작 중에 미끄러진다.
+	// 깃 버전은 루트 모션 몽타주라 원래 입력이 이동에 쓰이지 않으므로 결과가 같다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Movement")
+	FGameplayTagContainer MovementBlockedTags;
+
 	// 대상 탐색의 기준 방향. 이동 입력(플레이어의 스틱)이 있으면 그 방향, 없으면 캐릭터 정면 (6-2 결정)
 	// 이동 입력은 템플릿 Move가 카메라 기준으로 만든 월드 방향이다. AI는 이동 입력이 없으므로 정면이 된다
 	virtual FVector GetAttackTargetDirection() const;
