@@ -39,3 +39,6 @@ Content/__ExternalObjects__/ThirdParty/
 # 패키징 결과 (Tools/Build 스크립트, 9-4)
 Builds/
 Build/Windows/FileOpenOrder/
+
+# 포트폴리오 원고·스크린샷 (유료 에셋 화면, 지원 정보. 완성 PDF만 따로 제출)
+Docs/Portfolio/
