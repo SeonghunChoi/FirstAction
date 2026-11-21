@@ -17,6 +17,11 @@
 #include "PhysicsEngine/SkeletalBodySetup.h"
 #include "PreviewScene.h"
 #include "UObject/Package.h"
+#include "AI/NavigationSystemBase.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "UObject/UObjectIterator.h"
 
 bool UFirstActionEditorLibrary::SetMontageSlot(UAnimMontage* Montage, FName SlotName)
 {
@@ -318,6 +323,50 @@ UPhysicsAsset* UFirstActionEditorLibrary::CreateRagdollPhysicsAsset(USkeletalMes
 	PhysicsAsset->MarkPackageDirty();
 	UE_LOG(LogFirstAction, Log, TEXT("CreateRagdollPhysicsAsset: %s 바디 %d개, 관절 %d개"), *AssetPath, PhysicsAsset->SkeletalBodySetups.Num(), PhysicsAsset->ConstraintSetup.Num());
 	return PhysicsAsset;
+}
+
+bool UFirstActionEditorLibrary::SetUseComplexAsSimpleCollision(UStaticMesh* Mesh, bool bEnable)
+{
+	if (!Mesh)
+	{
+		return false;
+	}
+	if (!Mesh->GetBodySetup())
+	{
+		Mesh->CreateBodySetup();
+	}
+	UBodySetup* BodySetup = Mesh->GetBodySetup();
+	if (!BodySetup)
+	{
+		return false;
+	}
+
+	BodySetup->Modify();
+	BodySetup->CollisionTraceFlag = bEnable ? CTF_UseComplexAsSimple : CTF_UseDefault;
+	BodySetup->InvalidatePhysicsData();
+	BodySetup->CreatePhysicsMeshes();
+	// 내비 메시는 바디 설정이 아니라 메시의 NavCollision을 먼저 본다. 옛 단순 충돌(비어 있음)로 만든 것을 새로 만든다
+	Mesh->CreateNavCollision(true);
+	Mesh->MarkPackageDirty();
+
+	// 이미 놓인 컴포넌트는 물리 상태와 내비 데이터를 새 충돌로 갱신한다
+	int32 Updated = 0;
+	for (TObjectIterator<UStaticMeshComponent> It; It; ++It)
+	{
+		UStaticMeshComponent* Component = *It;
+		if (Component->GetStaticMesh() != Mesh || !Component->GetWorld())
+		{
+			continue;
+		}
+		if (Component->IsPhysicsStateCreated())
+		{
+			Component->RecreatePhysicsState();
+		}
+		FNavigationSystem::UpdateComponentData(*Component);
+		++Updated;
+	}
+	UE_LOG(LogFirstAction, Log, TEXT("SetUseComplexAsSimpleCollision: %s %s, 컴포넌트 %d개 갱신"), *Mesh->GetName(), bEnable ? TEXT("켬") : TEXT("끔"), Updated);
+	return true;
 }
 
 #endif

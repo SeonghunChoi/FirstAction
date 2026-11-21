@@ -205,7 +205,7 @@ float UGA_MeleeAttack::FindStopGapAt(const UAnimSequenceBase* Animation, float S
 	return 0.f;
 }
 
-bool UGA_MeleeAttack::ComputeWarpGoal(float StopGap, FVector& OutLocation, FVector& OutDirection, float& OutMoveDistance, AActor*& OutTarget) const
+bool UGA_MeleeAttack::ComputeWarpGoal(float StopGap, FVector& OutLocation, FVector& OutDirection, float& OutMoveDistance, AActor*& OutTarget, bool bVerbose) const
 {
 	ACombatCharacterBase* Character = GetCombatCharacter();
 	if (!Character || !CurrentAttack)
@@ -234,6 +234,10 @@ bool UGA_MeleeAttack::ComputeWarpGoal(float StopGap, FVector& OutLocation, FVect
 	OutMoveDistance = FMath::Clamp(ToTarget.Size() - ContactSpacing - StopGap, 0.f, MaxWarpDistance);
 	OutLocation = From + OutDirection * OutMoveDistance;
 
+	if (!bVerbose)
+	{
+		return true;
+	}
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 워핑: %s → %s (간격 %.0f, 멈출 간격 %.0f, 이동 %.0f / 최대 %.0f)"),
 		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), *GetNameSafe(OutTarget),
 		ToTarget.Size() - ContactSpacing, StopGap, OutMoveDistance, MaxWarpDistance);
@@ -318,8 +322,35 @@ void UGA_MeleeAttack::StartApproach(float StopGap, float Duration)
 
 	Character->ApplyTimedMove(ApproachSourceName, Goal, Duration);
 
-	UE_LOG(LogFirstAction, Log, TEXT("[%s] 접근: %s %.0fcm / %.2f초 (제자리 동작, Root Motion Source)"),
+	// 구간 동안 대상이 움직여도(밀려나는 중 등) 목표를 다시 계산해 따라 붙는다
+	ApproachStopGap = StopGap;
+	ApproachEndTime = Character->GetWorld()->GetTimeSeconds() + Duration;
+	Character->GetWorld()->GetTimerManager().SetTimer(ApproachTrackTimer, this, &UGA_MeleeAttack::TrackApproach, 1.f / 60.f, true);
+
+	UE_LOG(LogFirstAction, Log, TEXT("[%s] 접근: %s %.0fcm / %.2f초 (제자리 동작, Root Motion Source, 대상 추적)"),
 		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), MoveDistance, Duration);
+}
+
+void UGA_MeleeAttack::TrackApproach()
+{
+	static const FName ApproachSourceName(TEXT("AttackApproach"));
+	ACombatCharacterBase* Character = GetCombatCharacter();
+	UWorld* World = Character ? Character->GetWorld() : nullptr;
+	FVector Goal;
+	FVector Direction;
+	float MoveDistance = 0.f;
+	AActor* Target = nullptr;
+	if (!World || World->GetTimeSeconds() >= ApproachEndTime
+		|| !ComputeWarpGoal(ApproachStopGap, Goal, Direction, MoveDistance, Target, false)
+		|| !Character->UpdateTimedMoveTarget(ApproachSourceName, Goal))
+	{
+		if (World)
+		{
+			World->GetTimerManager().ClearTimer(ApproachTrackTimer);
+		}
+		return;
+	}
+	Character->SetActorRotation(FRotator(0.f, Direction.Rotation().Yaw, 0.f));
 }
 
 void UGA_MeleeAttack::ClearApproaches()
@@ -332,6 +363,7 @@ void UGA_MeleeAttack::ClearApproaches()
 			{
 				World->GetTimerManager().ClearTimer(Handle);
 			}
+			World->GetTimerManager().ClearTimer(ApproachTrackTimer);
 		}
 	}
 	ApproachTimers.Reset();

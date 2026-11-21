@@ -82,7 +82,8 @@ private:
 
 	// 워핑 목표 계산 (UpdateWarpTarget과 제자리 동작 접근이 함께 쓴다). 대상이 없으면 false
 	// OutLocation: 몸 간격이 StopGap이 되는 위치(최대 MaxWarpDistance), OutDirection: 대상 쪽 수평 방향
-	bool ComputeWarpGoal(float StopGap, FVector& OutLocation, FVector& OutDirection, float& OutMoveDistance, AActor*& OutTarget) const;
+	// bVerbose: 로그와 디버그 그림. 접근 추적(매 프레임)에서는 끈다
+	bool ComputeWarpGoal(float StopGap, FVector& OutLocation, FVector& OutDirection, float& OutMoveDistance, AActor*& OutTarget, bool bVerbose = true) const;
 
 	// 이 워핑 구간이 시작되는 시점을 덮는 Attack Reach 노티파이의 멈출 간격. 없으면 0 (휘두름별 칼이 닿는 거리)
 	static float FindStopGap(const URootMotionModifier* Modifier);
@@ -95,6 +96,12 @@ private:
 	void StartApproach(float StopGap, float Duration);
 	void ClearApproaches();
 	TArray<FTimerHandle> ApproachTimers;
+
+	// 접근하는 동안 목표를 다시 계산해 따라 붙는다 (9-3 시험: 앞 타에 밀려나는 중인 적을 시작 위치로만 쫓아 헛쳤다)
+	void TrackApproach();
+	FTimerHandle ApproachTrackTimer;
+	float ApproachStopGap = 0.f;
+	double ApproachEndTime = 0.0;
 
 	// Motion Warping 구간이 시작될 때마다 대상을 다시 묻는다 (6-6에서 발견한 문제의 수정)
 	// 엔진이 새 구간의 수정자(modifier)를 만든 직후, 활성화하기 직전에 불린다. 한 몽타주에 여러 번 휘두르는 공격(Heavy_Combo)도 휘두름마다 새 목표를 쓴다

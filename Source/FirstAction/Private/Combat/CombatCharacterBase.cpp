@@ -19,6 +19,7 @@
 #include "MotionWarpingComponent.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
 #include "Combat/PartialHitReactionComponent.h"
+#include "Effects/FootstepEffectComponent.h"
 #include "Combat/CombatCharacterData.h"
 #include "Combat/HitResolveSubsystem.h"
 #include "Combat/CombatSettings.h"
@@ -48,6 +49,7 @@ ACombatCharacterBase::ACombatCharacterBase()
 
 	PhysicalAnimation = CreateDefaultSubobject<UPhysicalAnimationComponent>(TEXT("PhysicalAnimation"));
 	PartialHitReaction = CreateDefaultSubobject<UPartialHitReactionComponent>(TEXT("PartialHitReaction"));
+	FootstepEffect = CreateDefaultSubobject<UFootstepEffectComponent>(TEXT("FootstepEffect"));
 
 	// 행동 중 이동 입력 차단 기본값 (9-3). 가드는 위에서 따로 처리(제자리 회전), 공중(InAir)은 공중 제어를 남긴다
 	MovementBlockedTags.AddTag(CombatTags::State_Attacking);
@@ -749,16 +751,32 @@ void ACombatCharacterBase::ApplyTimedMove(FName SourceName, const FVector& Targe
 	}
 	Movement->RemoveRootMotionSource(SourceName);
 
-	TSharedPtr<FRootMotionSource_MoveToForce> Source = MakeShared<FRootMotionSource_MoveToForce>();
+	// 목표를 도중에 바꿀 수 있는 MoveToDynamicForce (UpdateTimedMoveTarget)
+	TSharedPtr<FRootMotionSource_MoveToDynamicForce> Source = MakeShared<FRootMotionSource_MoveToDynamicForce>();
 	Source->InstanceName = SourceName;
 	Source->AccumulateMode = ERootMotionAccumulateMode::Override;
 	Source->Priority = 4;
 	Source->StartLocation = GetActorLocation();
-	Source->TargetLocation = FVector(TargetLocation.X, TargetLocation.Y, Source->StartLocation.Z);
+	Source->InitialTargetLocation = FVector(TargetLocation.X, TargetLocation.Y, Source->StartLocation.Z);
+	Source->TargetLocation = Source->InitialTargetLocation;
 	Source->Duration = FMath::Max(Duration, 0.05f);
-	Source->bRestrictSpeedToExpected = true;
+	// 목표가 움직이면(UpdateTimedMoveTarget) 처음 계산한 속도보다 빨라져야 따라 붙는다. 제한하면 밀려나는 적을 놓친다 (9-3)
+	Source->bRestrictSpeedToExpected = false;
 	// 도착하면 멈춘다. 기본값(마지막 속도 유지)이면 계속 미끄러진다
 	Source->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
 	Source->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
 	Movement->ApplyRootMotionSource(Source);
+}
+
+bool ACombatCharacterBase::UpdateTimedMoveTarget(FName SourceName, const FVector& TargetLocation)
+{
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const TSharedPtr<FRootMotionSource> Found = Movement ? Movement->GetRootMotionSource(SourceName) : nullptr;
+	if (!Found.IsValid() || Found->GetScriptStruct() != FRootMotionSource_MoveToDynamicForce::StaticStruct())
+	{
+		return false;
+	}
+	FRootMotionSource_MoveToDynamicForce* Source = static_cast<FRootMotionSource_MoveToDynamicForce*>(Found.Get());
+	Source->SetTargetLocation(FVector(TargetLocation.X, TargetLocation.Y, Source->StartLocation.Z));
+	return true;
 }

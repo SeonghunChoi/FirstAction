@@ -29,7 +29,8 @@ public class FirstAction : ModuleRules
 			"DeveloperSettings"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		// 발 디딤 연출 (9-3): FootstepEffectComponent가 바닥 물리 재질로 물을 판정한다
+		PrivateDependencyModuleNames.AddRange(new string[] { "PhysicsCore", "Niagara" });   // PhysicsCore: 바닥 물리 재질(UPhysicalMaterial), Niagara: 물보라 시스템(선택)
 
 		// 에디터 도구 (9-3): 래그돌 물리 에셋 생성(FirstActionEditorLibrary). 게임 빌드에는 넣지 않는다
 		if (Target.bBuildEditor)

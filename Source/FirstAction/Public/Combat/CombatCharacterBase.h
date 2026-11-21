@@ -21,6 +21,7 @@ class UMeleeTraceComponent;
 class UMotionWarpingComponent;
 class UPhysicalAnimationComponent;
 class UPartialHitReactionComponent;
+class UFootstepEffectComponent;
 class UCombatCharacterData;
 class UCharacterMovementComponent;
 struct FGameplayEventData;
@@ -165,6 +166,10 @@ public:
 	// 정해진 시간 동안 목표 위치까지 옮긴다 (Root Motion Source MoveTo, 도착하면 멈춤). 같은 이름의 이전 이동은 대체한다 (9-3)
 	// 제자리 동작(배포판 Paragon)의 공격 접근과 회피 이동이 쓴다
 	void ApplyTimedMove(FName SourceName, const FVector& TargetLocation, float Duration);
+
+	// 진행 중인 ApplyTimedMove의 목표를 바꾼다 (남은 시간은 그대로). 움직이는 대상을 따라 붙을 때 쓴다 (9-3)
+	// 그 이름의 이동이 없으면 false
+	bool UpdateTimedMoveTarget(FName SourceName, const FVector& TargetLocation);
 
 protected:
 	virtual void BeginPlay() override;
@@ -321,6 +326,10 @@ private:
 	// 부위 물리 반응 (Step 6-8). 타격 해석 결과의 속도 변화를 맞은 부위에 준다
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPartialHitReactionComponent> PartialHitReaction;
+
+	// 발 디딤 연출 (9-3 배포판 얕은 물). 물 재질이 지정된 캐릭터(배포판 BP)에서만 동작한다
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UFootstepEffectComponent> FootstepEffect;
 
 	// 시작 어빌리티/이펙트를 두 번 부여하지 않도록
 	bool bStartupGranted = false;

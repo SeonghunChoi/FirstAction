@@ -16,6 +16,7 @@ class UAnimMontage;
 class UAnimSequenceBase;
 class UPhysicsAsset;
 class USkeletalMesh;
+class UStaticMesh;
 
 UCLASS()
 class FIRSTACTION_API UFirstActionEditorLibrary : public UBlueprintFunctionLibrary
@@ -51,5 +52,11 @@ public:
 	// AssetPath(/Game/...)에 에셋이 있으면 비우고 다시 채운다(참조 유지). 저장은 호출하는 쪽에서
 	UFUNCTION(BlueprintCallable, Category = "FirstAction|Editor")
 	static UPhysicsAsset* CreateRagdollPhysicsAsset(USkeletalMesh* Mesh, const TArray<FName>& BodyBones, const FString& AssetPath);
+
+	// 스태틱 메시의 충돌 방식을 "정밀 충돌을 단순 충돌로 사용(Use Complex As Simple)"으로 바꾸거나 되돌린다 (9-3).
+	// 단순 충돌이 없는 바닥 메시(Agora 광장 바닥, 물 표면 판, 계단)는 캐릭터 이동과 내비 메시 생성이 무시해 떨어지거나 길이 끊긴다.
+	// 물리 데이터를 다시 만들고, 이 메시를 쓰는 컴포넌트의 물리 상태와 내비 데이터를 갱신한다. 저장은 호출하는 쪽에서
+	UFUNCTION(BlueprintCallable, Category = "FirstAction|Editor")
+	static bool SetUseComplexAsSimpleCollision(UStaticMesh* Mesh, bool bEnable);
 #endif
 };
