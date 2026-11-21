@@ -13,10 +13,10 @@
 
 namespace
 {
-	// 깃 버전에는 락온 표시 UI가 없어, 대상 머리 위에 디버그 표시를 그린다 (FirstAction.ShowLockOn 0으로 끔)
+	// 대상 머리 위 디버그 구(6-14). 락온 표시는 적 머리 위 위젯의 마름모가 맡으므로 기본은 끈다 (FirstAction.ShowLockOn 1로 켬)
 	TAutoConsoleVariable<bool> CVarShowLockOn(
 		TEXT("FirstAction.ShowLockOn"),
-		true,
+		false,
 		TEXT("락온 대상 머리 위에 표시를 그린다 (0: 끔, 1: 켬)"));
 }
 
