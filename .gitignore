@@ -35,3 +35,7 @@ Content/ThirdParty/
 # ThirdParty 맵(파일 단위 액터 저장)의 액터·오브젝트 파일. 맵 자체는 ThirdParty/에 있고 액터만 여기에 저장된다 (9-3)
 Content/__ExternalActors__/ThirdParty/
 Content/__ExternalObjects__/ThirdParty/
+
+# 패키징 결과 (Tools/Build 스크립트, 9-4)
+Builds/
+Build/Windows/FileOpenOrder/

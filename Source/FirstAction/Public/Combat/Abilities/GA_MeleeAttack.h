@@ -103,6 +103,19 @@ private:
 	float ApproachStopGap = 0.f;
 	double ApproachEndTime = 0.0;
 
+	// 공격 예비 동작 (9-4 이후): 몽타주 시작부터 첫 판정 구간까지 캐릭터 데이터의 배율로 느리게 하고 Telegraph Cue를 낸다.
+	// 첫 판정 구간이 열리면(UMeleeTraceComponent::OnTraceBegan) 원래 속도로. 몽타주가 바뀌거나 어빌리티가 끝나도 끈다
+	void BeginTelegraph(const UAnimMontage* Montage);
+	void EndTelegraph();
+	// 몽타주 시간 → 지금부터의 월드 시간 (예비 동작 감속을 반영). 접근 시작 타이머가 쓴다
+	float MontageTimeToWorldDelay(float MontageTime, float RateScale) const;
+	FDelegateHandle TraceBeganHandle;
+	float TelegraphScale = 1.f;            // 예전 방식(구간 없음)의 감속 중 배율
+	// 감속 구간 (몽타주 시간 시작, 끝, 배율). 접근 타이머의 시간 환산에 쓴다
+	struct FTelegraphInterval { float Start; float End; float Scale; };
+	TArray<FTelegraphInterval> TelegraphIntervals;
+	bool bComboContinuation = false;       // 콤보로 이어진 타인가 (예비 동작 배율이 다르다)
+
 	// Motion Warping 구간이 시작될 때마다 대상을 다시 묻는다 (6-6에서 발견한 문제의 수정)
 	// 엔진이 새 구간의 수정자(modifier)를 만든 직후, 활성화하기 직전에 불린다. 한 몽타주에 여러 번 휘두르는 공격(Heavy_Combo)도 휘두름마다 새 목표를 쓴다
 	UFUNCTION()

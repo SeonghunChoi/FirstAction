@@ -53,7 +53,7 @@
   - 그래프 덤프: `FirstAction.DumpBlueprintGraph <에셋 경로>` → `Saved/GraphDumps/<이름>.txt` (블루프린트·애님 BP의 모든 그래프, 노드 속성, 핀 연결, 변수)
   - 노드 삭제: `FirstAction.RemoveBlueprintNodes <에셋 경로> <노드 이름...>` (덤프의 노드 이름. 컴파일·저장은 Python)
   - 몽타주 편집: `unreal.FirstActionEditorLibrary`(`set_montage_slot`, `set_montage_segments`, `set_montage_segment_ranges`(클립 일부만), `set_montage_sections`, `describe_montage`). 노티파이·커브는 엔진 `AnimationLibrary`. 래그돌 물리 에셋: `create_ragdoll_physics_asset(메시, 뼈 목록, 경로)`. 바닥 충돌: `set_use_complex_as_simple_collision(스태틱 메시, True)`(단순 충돌이 없는 바닥을 걷고 내비 메시가 덮게. NavCollision까지 다시 만든다)
-  - 배포판 생성 스크립트: `Tools/Release/common.py` + 캐릭터별 스크립트(`aurora.py` 공격, `aurora_body.py` 반응·회피·데이터·BP·GameMode, `gasp_import.py` GASP FBX 임포트(마네킹 스켈레톤 지정), `retarget_gasp_aurora.py` IK Rig 자동 생성·리타기터·일괄 리타깃, `enemies.py` 적 Kwang·Greystone 공격·반응·데이터·패턴·BP, `measure_swings.py` 공격 클립의 판정 구간 후보 측정(칼끝 속도 + 정면 공간), `ragdoll.py` 세 캐릭터 래그돌 물리 에셋과 BP 지정, `release_map.py` 배포 맵 Agora 복제·내비·배치, `water_fx.py` 얕은 물 표면·물 물리 재질·발 디딤 물결 설정). 실행: `cat common.py <스크립트> > tmp && python Tools/ue_exec.py tmp`. 에셋이 있으면 지우지 않고 그 자리에서 갱신한다(지우면 다른 에셋의 참조가 끊긴다)
+  - 배포판 생성 스크립트: `Tools/Release/common.py` + 캐릭터별 스크립트(`aurora.py` 공격, `aurora_body.py` 반응·회피·데이터·BP·GameMode, `gasp_import.py` GASP FBX 임포트(마네킹 스켈레톤 지정), `retarget_gasp_aurora.py` IK Rig 자동 생성·리타기터·일괄 리타깃, `enemies.py` 적 Kwang·Greystone 공격·반응·데이터·패턴·BP, `measure_swings.py` 공격 클립의 판정 구간 후보 측정(칼끝 속도 + 정면 공간), `ragdoll.py` 세 캐릭터 래그돌 물리 에셋과 BP 지정, `release_map.py` 배포 맵 Agora 복제·내비·배치, `stages.py` 동선 4구간(구간·문·벽·막이·적 위치·다시 하기 위치·메뉴 카메라·내비 범위, release_map.py 다음), `water_fx.py` 얕은 물 표면·물 물리 재질·발 디딤 물결 설정). 실행: `cat common.py <스크립트> > tmp && python Tools/ue_exec.py tmp`. 에셋이 있으면 지우지 않고 그 자리에서 갱신한다(지우면 다른 에셋의 참조가 끊긴다)
   - 일괄 리타깃(`IKRetargetBatchOperation`)은 원본 폴더를 레지스트리가 모르면 결과를 `/Game` 바로 아래에 만든다(9-3에서 겪음, 18개를 디스크에서 지움). 스크립트가 먼저 폴더를 스캔하고 결과를 `rename_loaded_asset`으로 옮긴다. 작업 후 `Content/*.uasset`가 없는지 확인한다
   - 리타깃하면 IK 뼈(`ik_foot_l/r`, `ik_hand_l/r`)는 체인에 없어 기준 자세에 남고, Paragon 애님 BP의 다리 IK가 발을 그 자리로 끌어 두 발이 붙는다(9-3 회피에서 겪음). 리타기터 끝에 Pin Bone 오퍼레이션(대상의 `foot`/`hand` → IK 뼈, 전역 위치)을 둔다. 리타기터는 `remove_all_ops` 뒤 다시 만든다(안 그러면 실행마다 오퍼레이션이 쌓인다). 플레이 중에는 스크립트가 멈춘다
   - 큰 팩(수 GB)은 에디터에서 옮기지 않는다. 에디터 이동은 모든 에셋과 참조자를 열어 고쳐 저장해 메모리 부족으로 죽는다(9-3 Agora 11GB에서 겪음). 에디터를 닫고 디스크에서 `ThirdParty/`로 옮긴 뒤 `Config/DefaultEngine.ini`에 임시 `[CoreRedirects]` `+PackageRedirects=(OldName="/Game/옛/",NewName="/Game/ThirdParty/새/",MatchSubstring=true)`, 에디터에서 150개씩 다시 저장(메모리가 30GB를 넘으면 재시작), 맵은 열어 저장, 리다이렉트를 빼고 다시 열어 확인
@@ -61,6 +61,8 @@
   - 재질 그래프는 `MaterialEditingLibrary`로 만든다. Custom 노드는 하나만 두고, 출력을 여러 곳에 쓸 땐 곱하기(x1) 노드를 거친다(두 번째 연결이 빠져 컴파일 실패). 노드를 잇는 도중의 중간 컴파일 실패 로그는 무시하고 마지막 `recompile_material` 뒤 로그로 판단한다. Niagara 모듈 값은 Python으로 고칠 수 없다
   - 배포 맵은 파일 단위 액터 저장이라 액터가 `Content/__ExternalActors__/ThirdParty/`에 생긴다. `.gitignore` 대상
   - Live Coding 반영은 에디터를 다시 열면 사라진다(마지막 정식 빌드 DLL을 불러온다). Live Coding으로 고친 뒤에는 그 작업을 마치기 전에 정식 빌드로 고정한다(9-3 물 가르기 조건이 재시작 뒤 사라져 뛰기에 물결이 다시 쏟아졌다). 시험용 Python 틱 콜백은 try/except로 감싸 오류가 나도 스스로 해제되게 한다
+  - 맵은 `unreal.load_asset`으로 열지 않는다. 월드 객체가 남아 같은 맵을 `load_level`하면 "World Memory Leaks"로 에디터가 죽는다(9-4 이후에서 겪음). 맵 내용은 `LevelEditorSubsystem.load_level` 뒤 편집 월드에서 본다
+  - 패키징: `Tools/Build/Build-Release.ps1`(작업 폴더, Shipping), `Build-Default.ps1`(origin 새 클론, Development). 에디터를 닫고 실행한다(Live Coding이 켜져 있으면 UBT가 막는다). 한글이 든 `.ps1`은 BOM 있는 UTF-8로 저장한다(Windows PowerShell 5.1이 BOM 없는 파일을 cp949로 읽어 구문 오류)
   - 빌드: 에디터를 닫아야 할 때 Claude가 원격으로 저장 여부를 확인하고 `quit_editor`로 닫은 뒤 명령줄(`Build.bat`)로 빌드하고 다시 연다 (사용자 허락, 2026-11-20)
 
 ---
@@ -206,6 +208,7 @@ Source/FirstAction/
 │   │   └── Animation/
 │   │       ├── ANS_TagWindow.h
 │   │       ├── ANS_AttackReach.h      // 휘두름별 워핑 멈출 간격 (데이터 전용)
+│   │       ├── ANS_Telegraph.h        // 적 공격 예비 동작 감속·번쩍임 구간 (배율)
 │   │       └── ANS_HitWindow.h
 │   ├── Input/
 │   │   └── CombatInputConfig.h        // 입력 액션 → 입력 태그
@@ -216,6 +219,20 @@ Source/FirstAction/
 │   │   ├── CombatTokenSubsystem.h
 │   │   └── StateTree/
 │   │       └── EnemyStateTreeNodes.h  // 적 AI 조건(태그, 대상, 거리)과 태스크(접근, 맴돌기, 공격, 회복) (7-3)
+│   ├── Game/
+│   │   ├── StageEncounter.h           // 구간 하나: 들어오면 시작, 적을 순서대로 MaxAlive마리씩, 문, 다시 하기 (게임 흐름)
+│   │   ├── StageDoor.h                // 구간 사이 문: 다 잡으면 바닥 아래로 열림 (게임 흐름)
+│   │   └── RouteGuide.h               // 다음 구간 길 안내: 내비 경로 바닥 점선 + 문 빛기둥
+│   ├── Effects/
+│   │   ├── FootstepEffectComponent.h  // 발 디딤 물결·물방울 (9-3)
+│   │   ├── OverlayFlashComponent.h    // 몸·무기 오버레이 번쩍임 (연출 전용)
+│   │   └── GCN_OverlayFlash.h         // 번쩍임 GameplayCue (공격 예비 동작)
+│   ├── UI/
+│   │   ├── GameMenuWidget.h           // 로딩·시작·일시정지·사망·클리어·조작법 메뉴, C++로 트리를 만든다 (게임 흐름)
+│   │   ├── StageBannerWidget.h        // 구간 시작·클리어 알림 (게임 흐름)
+│   │   ├── EnemyStatusWidget.h        // 적 머리 위 체력·경직치 바, 조준·락온 표시
+│   │   ├── PlayerStatusWidget.h       // 플레이어 체력·경직치 바 (왼쪽 위)
+│   │   └── ControlHintWidget.h        // 플레이 중 조작 힌트 줄, 조작법 한 줄(FControlBinding)
 │   └── Content/
 │       ├── CombatContentSet.h         // 기본 → 배포 치환 표(몽타주, 애님 BP, 메시)와 짝 비교 검증 (9-1)
 │       ├── CombatContentSubsystem.h   // 활성 세트 로드·폴백, Resolve 함수 (9-1)
@@ -467,8 +484,13 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 
 - [x] Step 9-3 (1/? 설계·판정 소켓): 배포판 구성 결정(범위·배포 맵·Custom Config 타깃·대검·보유 Paragon: 플레이어 Greystone, 적 Kwang·적 전용 데이터·배포 맵 전용 BP·몸 메시 판정 소켓, PLAN 9장). Unity 311개·Fab 라이브러리 조사, Paragon Greystone/Kwang/Aurora를 `ThirdParty/`로. `UMeleeTraceComponent::SetBodyMesh`/`FindBladeMesh`(무기 메시 → 몸 메시 순으로 소켓 쌍), 콘텐츠 세트 누락 경고에서 `/Game/ThirdParty/` 제외, 에셋 규칙 3항을 기본 세트에만 적용. 두 스켈레톤에 `blade_start`/`blade_end`. 확인: 깃 버전 판정 그대로(더미 `thigh_r`), 소켓 저장. 알게 된 것: GASP 애니메이션 FBX 팩은 "프로젝트에 추가"로 넣으면 스켈레톤 없이 임포트돼 전부 실패(수동 임포트 필요), Aurora 샘플 BP 컴파일 오류(쓰지 않음) (2026-11-20)
 
+- [x] Step 9-3 (2/2 배포판 구성): Aurora 플레이어(돌진 회피 확인) + 배포판 적 Kwang(일반)·Greystone(엘리트) 생성(`enemies.py`, 데이터 검증 오류 0, `Lvl_ReleaseTest`에 Kwang 3·Greystone 1). 자동 플레이 20초로 접근·맴돌기·토큰·Combo3/4·엘리트 헛침 멈춤 확인. 사망 래그돌 자세 이상 → 세 캐릭터 래그돌 물리 에셋(뼈 20개) 교체(Kwang은 물리 에셋이 없어 칼에 맞지 않던 문제도 해결). 사용자 시험(2026-11-20): Kwang 경직·넘어짐·사망 래그돌, Greystone 플레이어 명중 12회, 패턴 Combo3/4·QuickJab·Mix·HeavyCombo·Slam. Flurry는 토큰 2개가 남은 때만 17%라 이번엔 안 나옴. 환경 Paragon: Agora를 `ThirdParty/ParagonProps`, `ThirdParty/ParagonAgora/`(SampleMap, KiteDemo, Lighting)로 이동(디스크 이동 + 리다이렉트 + 다시 저장, 깨진 참조 0). 배포 맵 `ThirdParty/Release/Maps/Lvl_Release_Agora`(`release_map.py`: ParagonSample 복제, 시작 광장 내비 메시, 시작점 단상 가운데, 적 4체, `SM_SkyFloor` 충돌 끔, 단순 충돌 없는 바닥 6종 정밀 충돌 사용 → 연못 광장·얕은 물도 걷고 내비 메시). `SM_SkyFloor`는 샘플 조명 하위 레벨에 있어 그 레벨도 저장, 전투 구역 둘레 보이지 않는 벽 4개. 자동 플레이로 인지·접근·맴돌기·공격·콤보, 물 위 세 지점 걷기, 벽 막힘 확인. 얕은 물 연출: 반투명 표면(발이 잠겨 보임), C++ `UFootstepEffectComponent`(발 뼈로 디딤 감지, 물 위면 물결 고리와 물방울, 코드가 밀어 옮길 때(대시·밀려남·공격 접근)만 항적 물결(물보라 없음, 사용자 판단). 물방울은 인스턴스 메시로 직접 계산(Niagara가 있으면 끔, `DropletsPerStep` 0), 사용자가 만든 Niagara `NS_Release_WaterSplash`를 발 디딤 `SplashSystem` 칸에 함께 띄움(`WakeSplashSystem`은 비움). `water_fx.py`는 이 Niagara를 만들거나 지우지 않고 있으면 끼우기만). 공격 접근이 구간 동안 대상을 따라 붙도록 수정(`ACombatCharacterBase::UpdateTimedMoveTarget`, `GA_MeleeAttack::TrackApproach`, 밀려나는 적에게 `Ability_E` 헛치던 문제). 사용자 시험 완료 (2026-11-21)
+
 ### 현재 위치
-- **Step 9-3** 진행 중: Aurora 플레이어(돌진 회피 확인) + 배포판 적 Kwang(일반)·Greystone(엘리트) 생성(`enemies.py`, 데이터 검증 오류 0, `Lvl_ReleaseTest`에 Kwang 3·Greystone 1). 자동 플레이 20초로 접근·맴돌기·토큰·Combo3/4·엘리트 헛침 멈춤 확인. 사망 래그돌 자세 이상 → 세 캐릭터 래그돌 물리 에셋(뼈 20개) 교체(Kwang은 물리 에셋이 없어 칼에 맞지 않던 문제도 해결). 사용자 시험(2026-11-20): Kwang 경직·넘어짐·사망 래그돌, Greystone 플레이어 명중 12회, 패턴 Combo3/4·QuickJab·Mix·HeavyCombo·Slam. Flurry는 토큰 2개가 남은 때만 17%라 이번엔 안 나옴. 환경 Paragon: Agora를 `ThirdParty/ParagonProps`, `ThirdParty/ParagonAgora/`(SampleMap, KiteDemo, Lighting)로 이동(디스크 이동 + 리다이렉트 + 다시 저장, 깨진 참조 0). 배포 맵 `ThirdParty/Release/Maps/Lvl_Release_Agora`(`release_map.py`: ParagonSample 복제, 시작 광장 내비 메시, 시작점 단상 가운데, 적 4체, `SM_SkyFloor` 충돌 끔, 단순 충돌 없는 바닥 6종 정밀 충돌 사용 → 연못 광장·얕은 물도 걷고 내비 메시). `SM_SkyFloor`는 샘플 조명 하위 레벨에 있어 그 레벨도 저장, 전투 구역 둘레 보이지 않는 벽 4개. 자동 플레이로 인지·접근·맴돌기·공격·콤보, 물 위 세 지점 걷기, 벽 막힘 확인. 얕은 물 연출: 반투명 표면(발이 잠겨 보임), C++ `UFootstepEffectComponent`(발 뼈로 디딤 감지, 물 위면 물결 고리와 물방울, 코드가 밀어 옮길 때(대시·밀려남·공격 접근)만 항적 물결(물보라 없음, 사용자 판단). 물방울은 인스턴스 메시로 직접 계산(Niagara가 있으면 끔, `DropletsPerStep` 0), 사용자가 만든 Niagara `NS_Release_WaterSplash`를 발 디딤 `SplashSystem` 칸에 함께 띄움(`WakeSplashSystem`은 비움). `water_fx.py`는 이 Niagara를 만들거나 지우지 않고 있으면 끼우기만). 공격 접근이 구간 동안 대상을 따라 붙도록 수정(`ACombatCharacterBase::UpdateTimedMoveTarget`, `GA_MeleeAttack::TrackApproach`, 밀려나는 적에게 `Ability_E` 헛치던 문제). 다음: 사용자 시험 → 9-4 빌드 스크립트
+- **Step 9-4** 진행 중: `Tools/Build/Build-Release.ps1`(작업 폴더, Shipping, 빌드 동안만 `GameDefaultMap`을 배포 맵으로) → `Builds/Release` 4.3GB, 실행하면 Agora로 열리고 기본 맵은 쿡되지 않음, ini 원래 바이트로 복원 확인. `-cmdline`은 윈도우에서 무시돼 결정 변경. `Build-Default.ps1`(origin 새 클론, Development)은 작성만, 커밋·push 뒤 실행
+- 게임 흐름 (9-4 중 사용자 요청, 2026-11-21): `AFirstActionGameMode`가 플레이어를 바로 만들지 않고 로딩 화면에서 텍스처 스트리밍·PSO·비동기 로딩을 기다린 뒤(최소 1초, 최대 30초) 맵 풍경 위 시작 메뉴, 시작하면 플레이어 생성. 사망 3초 뒤 사망 메뉴(다시 하기: 아직 깨지 않은 첫 구간 입구 / 처음부터: 맵을 `SkipMenu`로 다시 열기 / 메뉴로), 모든 구간 클리어 메뉴, 일시정지(`IA_Pause`: 패드 Start·Esc·P, 깃 에셋 `IMC_Combat`·`BP_ThirdPersonPlayerController` 수정). `AStageEncounter`(구간 상자, 적 순서·`MaxAlive`, 플레이어에게서 먼 생성 위치, 뒤 문 닫기·앞 문 열기, 되돌리기), `AStageDoor`, C++ 위젯 `UGameMenuWidget`·`UStageBannerWidget`(영문 글자: 기본 폰트 한글 누락 위험), 콘솔 `FirstAction.SkipMenu`. 배포 맵 `stages.py`: 4구간(웨이브: [K][K] / [K][K][K] / [K+K] / [K][G+K], 한 웨이브는 한꺼번에 서로 다른 생성 위치에, 다 쓰러지면 다음. `AStageEncounter::Waves`(`FStageWave`), 2026-11-21 사용자 요청으로 3·4구간 마지막을 두 명 동시로. 적 생성·다시 하기 위치 높이는 내비 메시 기준: 아래로 쏜 선은 가시성 충돌 없는 윗 광장 바닥을 뚫어 적이 바닥 밑에 생겼고 나무 꼭대기에도 걸렸다), 구간 사이 가로선 3개(보이지 않는 막이 + 낮은 바닥 위 `JungleWall_02A` + 문과 기둥), 바깥 경계, 내비 범위 동선 전체, `MenuCamera`. PIE 확인: 로딩 1.2초 → 메뉴, 구간 진행(한 마리씩, 클리어 → 문 열림), 길찾기 이동으로 문 통과해 4구간 끝까지 → 클리어, 구간 3에서 사망 → 입구에서 다시, 깃 맵(구간 없음) 다시 하기 = 맵 다시 열기. 고친 것: 구간을 깬 직후 죽으면 닫힌 문 뒤로 되살아나던 문제(첫 미클리어 구간 기준으로). 사용자 시험 완료
+- 사용자 요청 2차 (2026-11-21): 적 공격 예비 동작(첫 판정 구간까지 캐릭터 시간 배율 `SetTelegraphTimeScale`, `UMeleeTraceComponent::OnTraceBegan`에 원래대로, 접근 타이머는 감속 반영 `MontageTimeToWorldDelay`, `GCN_Attack_Telegraph` = `UGCN_OverlayFlash` + `M_OverlayFlash`), 적 머리 위 `UEnemyStatusWidget`(컨트롤러 `PlayerTick`이 조준·락온 대상을 정함, `AimIndicatorDistance` 500), `ARouteGuide`(`BP_RouteGuide`, `M_GuideGlow`/`MI_GuideDot`/`MI_GuidePillar`, 게임 모드 `UpdateRouteGuide`), 조작법(입력 액션 Action Description, 메뉴 CONTROLS, `UControlHintWidget`, 컨트롤러 `InputKey`로 장치 판별). 깃 에셋은 `Tools/Portfolio/game_ui_assets.py`로 생성(입력 액션 설명, 적 캐릭터 데이터 0.55/0.8 포함), 배포 적 데이터도 0.55/0.8(`enemies.py`에 반영). 확인: 빌드 성공, PIE 시작 메뉴에 CONTROLS, 1구간 시작·적 생성. **미확인**: 번쩍임·감속·바·마름모·길 안내·힌트 줄·조작법 화면 모습(사용자 시험). 알려진 것: 배포판 Aurora는 가드가 없는데 조작법에 Guard가 보인다, 에디터에서 P는 내비 표시 토글(플레이 중에는 일시정지). 사용자 시험 완료. 플래너 리플렉션 제거(글로벌 클립 플레인 경고), 텍스처 스트리밍 풀 3000MB(`Config/DefaultScalability.ini`)
+- 사용자 요청 3차 (2026-11-21): 플레이어 체력바 `UPlayerStatusWidget`(왼쪽 위, 잔상). 예비 동작 구간 `ANS_Telegraph`(+`ACombatCharacterBase::BeginTelegraphWindow`/`SetTelegraphWindowStrength`, 데이터 `TelegraphComboStrength`), 칼끝 속도 측정으로 정점 확인, `common.add_telegraph`와 `enemies.py` `KWANG_TELEGRAPH`/`GREY_TELEGRAPH`로 배포판 공격 12개에 배치. PIE 측정: 첫 타 0.12배 구간 공격마다 약 0.37초, 콤보 0.56배, 히트스톱 0.05배 별도. 다음: 사용자 시험 → 커밋 → 기본 빌드
 - 알려진 현상: 점프 중에 맞으면 공중에서 경직 몽타주가 재생된다(공중 피격 반응은 따로 없음). 배포 빌드 후보
 - Step 7 마무리 점검에서 확인됨 (2026-11-19): 머리 몽타주(`AM_UAL1_Hit_Head`, 맞은 본 head), 맞은 쪽 흔들림(6-1), 밀림 벽 정지, 경직·그로기 중 회피 금지(입력은 버퍼로만), 슬로모션 중 히트스톱 겹침(6-13, 히트스톱 뒤 슬로모션 유지. 슬로모션 1.5초가 짧게 느껴짐 → 배포 빌드 튜닝 후보)
 - Step 8에서 다시 확인할 것 (Step 7 마무리에서 사용자 판단으로 이월, 적 2체로 시험하면 쉬움): 누운 구간 반응 없음(6-7), 6-11 등 뒤에서 때리면 가드 불성립(정면 각도), 6-12 패리 후 반격(`Parry` 구간 캔슬), 사망 시 락온 다음 대상(6-14)
@@ -587,6 +609,20 @@ Claude Code는 스텝이 끝날 때마다 이 절을 갱신한다.
 - 2026-11-21: 배포 맵 전투 경계는 내비 범위 둘레의 보이지 않는 벽(9-3). 캐릭터만 막고 카메라·시야선은 통과
 - 2026-11-21: 배포 맵 물 연출은 얕은 물 표면(바닥 25cm 위 반투명) + 발 디딤 물결·물방울(9-3). 디딤은 발 뼈 움직임으로, 물 판정은 바닥 물리 재질로
 - 2026-11-21: 물 가르기(대시·밀려남·공격 접근)는 물결만, 물보라는 발 디딤에만(9-3 시험 후)
+- 2026-11-21: 빌드 구성은 배포 Shipping, 기본 Development(9-4)
+- 2026-11-21: 기본 빌드 시작 맵은 `Lvl_TestEnemies`(9-4)
+- 2026-11-21: (처음 변경) 배포 빌드 시작 맵은 BuildCookRun `-cmdline`(빌드 안 `UECommandLine.txt`)과 `-map`으로(9-4). 배포 전용 타깃의 `CustomConfig`는 설치형 엔진에서 고유 빌드 환경을 막아 쓸 수 없다
+- 2026-11-21: 게임 흐름은 게임 맵 위 메뉴(9-4 이후). 로딩 화면에서 텍스처 스트리밍·PSO 준비·비동기 로딩을 기다린 뒤 맵 풍경 위 시작 메뉴, 시작할 때 플레이어를 만든다. 일시정지 메뉴 포함. 메뉴는 C++ 위젯
+- 2026-11-21: 배포 맵 동선은 4구간(시작 광장 → 원형 극장 → 윗 광장 → 신전), 적은 구간마다 한 마리씩(`AStageEncounter`). **변경**(시험 후): 구간은 웨이브 목록, 3구간은 두 명 한 웨이브, 4구간 마지막 웨이브는 Greystone+Kwang
+- 2026-11-21: 구간 사이는 벽으로 나누고 문을 둔다(사용자 안). 들어서면 뒤 문이 닫히고 다 잡으면 앞 문이 열린다. 보이지 않는 막이 + 낮은 바닥 위 폐허 벽 + 문
+- 2026-11-21: 죽으면 아직 깨지 않은 첫 구간의 입구에서 다시(그 구간만 되돌림). 사망 메뉴는 다시 하기 / 처음부터 / 메뉴로
+- 2026-11-21: 적 공격 예비 동작(몽타주 시작 ~ 첫 판정 구간)은 캐릭터 시간 배율 감속 + `GameplayCue.Attack.Telegraph` 번쩍임. 배율은 캐릭터 데이터(첫 타 0.55, 콤보로 이어진 타 0.8), 플레이어는 1
+- 2026-11-21: **변경** 예비 동작은 몽타주의 `ANS_Telegraph` 구간(배율)으로 늘린다. 칼을 치켜든 정점에 짧고 강하게(Kwang·Fast 0.12배), 콤보로 이어진 타는 절반. 구간이 없으면 예전 방식(첫 판정까지 전체)
+- 2026-11-21: 플레이어 체력·경직치는 화면 왼쪽 위 바(맞은 만큼 잠시 남는 잔상)
+- 2026-11-21: 타겟팅 표시는 적 머리 위 체력·경직치 바 + 조준 대상(흰 마름모)·락온 대상(주황 마름모)
+- 2026-11-21: 길 안내는 다음 구간 입구 문까지 바닥 점선(내비 경로) + 문 빛기둥
+- 2026-11-21: 조작법은 메뉴 CONTROLS 표 + 플레이 중 힌트 줄, 입력 매핑과 Action Description에서 자동 생성, 마지막 장치에 맞춰 표기
+- 2026-11-21: **결정 변경** 배포 빌드 시작 맵은 `Build-Release.ps1`이 빌드 동안만 `DefaultEngine.ini`의 `GameDefaultMap`을 바꾸고 끝나면 되돌린다(9-4). 윈도우 패키징은 `-cmdline`을 무시한다(`WinPlatform.ShouldStageCommandLine` = false)
 - 2026-11-18: 경직되는 순간 공격 토큰을 반납한다(7-2). 반납은 `UCombatTokenSubsystem`이 토큰 보유자의 상태 태그를 보고 하고, AI는 반납을 모른다
 - 2026-11-17: 편은 엔진 `IGenericTeamAgentInterface` 하나로 나눈다(7-1). 전투 코드와 AI 인지가 같은 값. 팀 번호는 캐릭터 BP(플레이어 0, 적·더미 1), AI 컨트롤러에는 빙의할 때 넘긴다. 같은 편끼리는 칼에 맞지 않는다
 - 2026-11-17: 사망은 `Event.Death` → `GA_Death`(`State.Dead`, 어빌리티 취소, 이동·충돌 끔, 사망 몽타주 후 래그돌)(7-1). 적은 `DeathRemovalTime` 뒤 제거, 더미는 자동 리필 유지

@@ -10,6 +10,7 @@
 
 class UAttackDataAsset;
 class UEnemyPatternDataAsset;
+class UWidgetComponent;
 
 // 사망 알림 (템플릿 ACombatEnemy의 FOnEnemyDied와 같은 모양, 이름은 겹치지 않게). 스포너가 전멸을 세는 데 쓴다
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEnemyCharacterDied);
@@ -55,6 +56,14 @@ protected:
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Combat|Enemy|Test", meta = (ClampMin = "0.5", Units = "s"))
 	float TestAttackInterval = 3.f;
+
+	// 머리 위 체력·경직치 바와 조준 표시 (9-4 이후 타겟팅 UI, UEnemyStatusWidget). 화면 공간, 캡슐 위
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Enemy")
+	TObjectPtr<UWidgetComponent> StatusWidget;
+
+	// 캡슐 꼭대기에서 표시까지 높이
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Enemy", meta = (Units = "Centimeters"))
+	float StatusWidgetHeight = 45.f;
 
 private:
 	void RequestTestAttack();

@@ -87,6 +87,13 @@ def add_hit(m, start, end):
     return ANIM.add_animation_notify_state_event(m, _track(m, "Hit"), start, end - start, unreal.ANS_HitWindow)
 
 
+def add_telegraph(m, start, end, scale):
+    """공격 예비 동작 구간 (9-4 이후): 이 동안 적만 scale배로 느려지고 시작에 번쩍인다. 칼을 치켜든 정점에 짧고 강하게"""
+    ns = ANIM.add_animation_notify_state_event(m, _track(m, "Telegraph"), start, end - start, unreal.ANS_Telegraph)
+    ns.set_editor_property("time_scale", scale)
+    return ns
+
+
 def add_warp(m, start, end, translation=True):
     """공격 접근 구간. 제자리 동작(루트 모션 없음)은 GA_MeleeAttack이 이 구간 동안 Root Motion Source로 옮긴다 (9-3)"""
     ns = ANIM.add_animation_notify_state_event(m, _track(m, "MotionWarping"), start, end - start, unreal.AnimNotifyState_MotionWarping)
@@ -136,10 +143,11 @@ def make_child_bp(path, parent_path):
     return load_or_create(path, unreal.Blueprint, factory)
 
 
-def build_attacks(out, prefix, attacks, values, links):
+def build_attacks(out, prefix, attacks, values, links, telegraphs=None):
     """공격 몽타주·데이터를 만들고 콤보 링크를 잇는다 (9-3 적).
     attacks: [(이름, [(시퀀스, 시작, 끝|None)], 블렌드 아웃, 판정 구간들, 워핑 (시작, 끝), 콤보 구간|None, 캔슬 시작)]
-    values: {이름: (틀 데이터 경로, 값)}, links: {이름: [(입력 태그, 다음 이름)]}"""
+    values: {이름: (틀 데이터 경로, 값)}, links: {이름: [(입력 태그, 다음 이름)]}
+    telegraphs: {이름: [(시작, 끝, 배율)]} 예비 동작 구간 (9-4 이후)"""
     saved, montages, data = [], {}, {}
     for name, segs, blend_out, hits, warp, combo, cancel_start in attacks:
         path = out + "Montages/AM_" + prefix + "_" + name
@@ -153,6 +161,8 @@ def build_attacks(out, prefix, attacks, values, links):
         if combo:
             add_window(m, combo[0], min(combo[1], length - blend_out), "Window.Combo")
         add_window(m, cancel_start, length, "Window.Cancel")
+        for a, b, s in (telegraphs or {}).get(name, []):
+            add_telegraph(m, a, b, s)
         montages[name] = m
         saved.append(path)
     for name, (template, vals) in values.items():

@@ -74,6 +74,7 @@ bool UMeleeTraceComponent::ComputeBladeSamples(TArray<FVector>& OutPoints) const
 
 void UMeleeTraceComponent::BeginTrace()
 {
+	OnTraceBegan.Broadcast();
 	HitActors.Reset();
 	PreviousSamples.Reset();
 	SweepFrameCount = 0;

@@ -5,6 +5,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Combat/AttackDataAsset.h"
 #include "Combat/CombatTags.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/WidgetComponent.h"
+#include "UI/EnemyStatusWidget.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "FirstAction.h"
@@ -25,6 +28,15 @@ AEnemyCharacter::AEnemyCharacter()
 	// 길찾기 이동(MoveTo)도 가속도로 움직인다. 기본값은 속도를 바로 넣어 가속도가 0이라,
 	// 가속도로 걷기를 판단하는 ABP_Unarmed(Should Move)가 대기 자세로 남아 미끄러져 보인다 (템플릿 BP_CombatEnemy도 켬)
 	GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
+
+	// 머리 위 상태 표시 (9-4 이후). 화면 공간이라 거리와 상관없이 같은 크기, 다른 물체에 가려지지 않는다
+	StatusWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("StatusWidget"));
+	StatusWidget->SetupAttachment(GetCapsuleComponent());
+	StatusWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	StatusWidget->SetDrawAtDesiredSize(true);
+	StatusWidget->SetWidgetClass(UEnemyStatusWidget::StaticClass());
+	StatusWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	StatusWidget->SetCanEverAffectNavigation(false);
 }
 
 AActor* AEnemyCharacter::FindAttackTarget(float MaxDistance) const
@@ -43,6 +55,15 @@ AActor* AEnemyCharacter::FindAttackTarget(float MaxDistance) const
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 캡슐 꼭대기 위 (스케일 반영)
+	const float HalfHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+	StatusWidget->SetRelativeLocation(FVector(0.f, 0.f, HalfHeight + StatusWidgetHeight / FMath::Max(GetActorScale3D().Z, 0.01f)));
+	StatusWidget->InitWidget();
+	if (UEnemyStatusWidget* Status = Cast<UEnemyStatusWidget>(StatusWidget->GetUserWidgetObject()))
+	{
+		Status->SetCharacter(this);
+	}
 
 	if (TestAttack && GetWorld())
 	{

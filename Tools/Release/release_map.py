@@ -8,8 +8,8 @@ GAMEMODE = "/Game/ThirdParty/Release/BP_GameMode_Release"
 KWANG = "/Game/ThirdParty/Release/Kwang/BP_Enemy_Kwang"
 GREYSTONE = "/Game/ThirdParty/Release/Greystone/BP_Enemy_Greystone"
 NAV_CENTER, NAV_EXTENT = unreal.Vector(0, 1000, 0), unreal.Vector(1800, 2000, 600)
-# 연못 광장 바닥은 내비 메시가 생기지 않아(걸을 수 없는 바닥) 적은 원형 단상 맞은편 걸을 수 있는 곳에 둔다
-ENEMIES = [(KWANG, "Kwang_1", 600, 900), (KWANG, "Kwang_2", -600, 900), (KWANG, "Kwang_3", -1000, 300), (GREYSTONE, "Greystone_1", 0, 1100)]
+# 적은 맵에 두지 않는다. 구간(AStageEncounter)이 하나씩 생성한다 (stages.py, 게임 흐름). 내비 범위와 경계 벽도 stages.py가 동선 전체로 넓힌다
+ENEMIES = []
 
 # 단순 충돌이 없는 바닥 메시: 캐릭터 이동과 내비 메시가 무시해 떨어지거나 길이 끊긴다(연못 광장 바닥, 물 표면 판 -71cm, 계단 등).
 # 샘플은 맵 전체를 덮는 SM_SkyFloor의 거대한 볼록 충돌이 대신 떠받치고 있었는데, 이 충돌이 적 시야선도 막아 끈다.
@@ -44,6 +44,13 @@ for a in eas.get_all_level_actors():
         a.static_mesh_component.set_collision_profile_name("NoCollision")
         log("sky floor collision off", a.get_actor_label())
 
+# 샘플의 플래너 리플렉션(호수 반사)은 지운다(9-4 이후 결정). 프로젝트 설정의 글로벌 클립 플레인이 꺼져 있어 제대로 동작하지 않고
+# ("플레이너 리플렉션의 정상 작동을 위해서는 글로벌 클립 플레인..." 경고), 켜면 모든 셰이더 재컴파일과 그리기 비용이 든다. 물 반사는 Lumen이 맡는다
+for a in eas.get_all_level_actors():
+    if isinstance(a, unreal.PlanarReflection):
+        log("planar reflection removed", a.get_actor_label())
+        eas.destroy_actor(a)
+
 floor_meshes = {}
 for a in eas.get_all_level_actors():
     if isinstance(a, unreal.StaticMeshActor) and a.static_mesh_component.static_mesh and a.static_mesh_component.static_mesh.get_name() in COMPLEX_FLOORS:
@@ -60,7 +67,7 @@ nav.set_actor_scale3d(unreal.Vector(NAV_EXTENT.x / 100.0, NAV_EXTENT.y / 100.0, 
 START_XY = (-30, 400)
 ps = [a for a in eas.get_all_level_actors() if isinstance(a, unreal.PlayerStart)][0]
 g = unreal.SystemLibrary.line_trace_single(world, unreal.Vector(START_XY[0], START_XY[1], 4000), unreal.Vector(START_XY[0], START_XY[1], -500), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, True, [], unreal.DrawDebugTrace.NONE, True).to_tuple()
-cx = sum(e[2] for e in ENEMIES) / len(ENEMIES); cy = sum(e[3] for e in ENEMIES) / len(ENEMIES)
+cx, cy = (sum(e[2] for e in ENEMIES) / len(ENEMIES), sum(e[3] for e in ENEMIES) / len(ENEMIES)) if ENEMIES else (0, 1500)   # 광장 안쪽을 본다
 ps.set_actor_location_and_rotation(unreal.Vector(START_XY[0], START_XY[1], g[4].z + 100),
                                    unreal.Rotator(0, 0, unreal.MathLibrary.find_look_at_rotation(unreal.Vector(START_XY[0], START_XY[1], 0), unreal.Vector(cx, cy, 0)).yaw), False, True)
 start = ps.get_actor_location()

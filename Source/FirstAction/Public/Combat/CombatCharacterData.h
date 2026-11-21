@@ -55,6 +55,11 @@ public:
 
 	UAnimMontage* GetDeathMontage() const { return DeathMontage; }
 
+	// 공격 예비 동작의 시간 배율 (9-4 이후). 콤보로 이어진 타는 따로
+	float GetTelegraphTimeScale(bool bComboContinuation) const { return bComboContinuation ? TelegraphComboTimeScale : TelegraphTimeScale; }
+	bool UsesTelegraph() const { return TelegraphTimeScale < 1.f; }
+	float GetTelegraphComboStrength() const { return TelegraphComboStrength; }
+
 #if WITH_EDITOR
 	// 데이터 검증 (Step 8-3)
 	// 오류: 질량 0 이하, 공격 토큰 1 미만
@@ -90,6 +95,21 @@ protected:
 	// 버튼을 떼면 End로 넘어가고, 몽타주가 끝나면 가드가 끝난다. 구간 이름은 GA_Guard 기본값과 같아야 한다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Guard")
 	TObjectPtr<UAnimMontage> GuardMontage;
+
+	// 공격 예비 동작(공격 몽타주 시작 ~ 첫 판정 구간) 동안 이 캐릭터의 시간 배율 (9-4 이후, 적 공격을 알아보고 피할 시간)
+	// 1이면 그대로(플레이어). 1보다 작으면 그만큼 느려지고 GameplayCue.Attack.Telegraph(번쩍임)를 낸다.
+	// 타이밍은 몽타주의 판정 구간이 정한다(규칙 3). 공격 데이터는 플레이어와 적이 함께 쓰므로 몸의 데이터에 둔다
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Telegraph", meta = (ClampMin = "0.1", ClampMax = "1.0"))
+	float TelegraphTimeScale = 1.f;
+
+	// 콤보로 이어진 타의 예비 동작 시간 배율. 보통 첫 타보다 1에 가깝게 (콤보 속도감 유지)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Telegraph", meta = (ClampMin = "0.1", ClampMax = "1.0"))
+	float TelegraphComboTimeScale = 1.f;
+
+	// 몽타주에 예비 동작 구간(ANS_Telegraph)이 있으면 위 두 배율 대신 구간의 배율을 쓴다(9-4 이후 2차).
+	// 콤보로 이어진 타는 이 비율만큼만 적용한다 (0 = 감속 없음, 1 = 구간 배율 그대로). 첫 타는 늘 구간 배율 그대로
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Telegraph", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float TelegraphComboStrength = 0.5f;
 
 	// 사망 몽타주 (7-1). 끝나면 래그돌로 넘어간다
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death")

@@ -19,6 +19,10 @@
 #include "RootMotionModifier.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Combat/Animation/ANS_AttackReach.h"
+#include "Combat/Animation/ANS_HitWindow.h"
+#include "Combat/Animation/ANS_Telegraph.h"
+#include "Combat/CombatCharacterData.h"
+#include "Combat/MeleeTraceComponent.h"
 #include "AnimNotifyState_MotionWarping.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
@@ -103,6 +107,7 @@ void UGA_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] GA_MeleeAttack 시작: %s"),
 		*GetNameSafe(GetAvatarActorFromActorInfo()), *GetNameSafe(CurrentAttack));
 
+	bComboContinuation = false;
 	PlayCurrentAttackMontage();
 
 	// 콤보 구간이 열리는 순간을 기다린다. 콤보가 이어지면 다음 몽타주의 구간에서도 다시 불린다(OnlyTriggerOnce = false)
@@ -172,6 +177,9 @@ void UGA_MeleeAttack::PlayCurrentAttackMontage()
 	MontageTask->OnInterrupted.AddDynamic(this, &UGA_MeleeAttack::OnMontageCancelled);
 	MontageTask->OnCancelled.AddDynamic(this, &UGA_MeleeAttack::OnMontageCancelled);
 	MontageTask->ReadyForActivation();
+
+	// 적 공격 예비 동작 감속과 번쩍임 (9-4 이후). 접근 타이머가 감속을 반영하도록 먼저 켠다
+	BeginTelegraph(Montage);
 
 	// 제자리 동작(루트 모션 없음)이면 워핑 구간 동안 직접 옮긴다 (9-3)
 	ClearApproaches();
@@ -288,8 +296,105 @@ void UGA_MeleeAttack::ScheduleApproaches(const UAnimMontage* Montage)
 			{
 				StartApproach(StopGap, Duration);
 			}
-		}), StartTime / Rate, false);
+		}), MontageTimeToWorldDelay(StartTime, Rate), false);
 	}
+}
+
+float UGA_MeleeAttack::MontageTimeToWorldDelay(float MontageTime, float RateScale) const
+{
+	// 예비 동작 감속 구간은 배율만큼 늘어난다. 히트스톱 등 그 밖의 시간 배율은 예측하지 않는다
+	const float Rate = FMath::Max(RateScale, KINDA_SMALL_NUMBER);
+	float Delay = MontageTime;
+	for (const FTelegraphInterval& Interval : TelegraphIntervals)
+	{
+		const float Overlap = FMath::Clamp(MontageTime, Interval.Start, Interval.End) - Interval.Start;
+		Delay += Overlap * (1.f / FMath::Max(Interval.Scale, 0.05f) - 1.f);
+	}
+	return Delay / Rate;
+}
+
+void UGA_MeleeAttack::BeginTelegraph(const UAnimMontage* Montage)
+{
+	EndTelegraph();
+
+	ACombatCharacterBase* Character = GetCombatCharacter();
+	const UCombatCharacterData* Data = Character ? Character->GetCharacterData() : nullptr;
+	UMeleeTraceComponent* MeleeTrace = Character ? Character->GetMeleeTrace() : nullptr;
+	const float Scale = Data ? Data->GetTelegraphTimeScale(bComboContinuation) : 1.f;
+	if (!Montage || !MeleeTrace || !Data || !Data->UsesTelegraph())
+	{
+		return;
+	}
+
+	// 몽타주에 예비 동작 구간(ANS_Telegraph)이 있으면 그 구간이 감속과 번쩍임을 맡는다. 캐릭터는 이 비율만큼 따른다
+	const float WindowStrength = bComboContinuation ? Data->GetTelegraphComboStrength() : 1.f;
+	for (const FAnimNotifyEvent& Event : Montage->Notifies)
+	{
+		if (const UANS_Telegraph* Window = Cast<UANS_Telegraph>(Event.NotifyStateClass))
+		{
+			TelegraphIntervals.Add({ Event.GetTriggerTime(), Event.GetEndTriggerTime(), FMath::Lerp(1.f, Window->TimeScale, WindowStrength) });
+		}
+	}
+	if (TelegraphIntervals.Num() > 0)
+	{
+		Character->SetTelegraphWindowStrength(WindowStrength);
+		return;
+	}
+	if (Scale >= 1.f)
+	{
+		return;
+	}
+
+	// 구간이 없으면 예전 방식: 몽타주 시작 ~ 첫 판정 구간 전체 (타이밍은 애니메이션, 규칙 3). 판정 구간이 없으면 감속하지 않는다
+	float FirstHitTime = TNumericLimits<float>::Max();
+	for (const FAnimNotifyEvent& Event : Montage->Notifies)
+	{
+		if (Cast<UANS_HitWindow>(Event.NotifyStateClass))
+		{
+			FirstHitTime = FMath::Min(FirstHitTime, Event.GetTriggerTime());
+		}
+	}
+	if (FirstHitTime == TNumericLimits<float>::Max() || FirstHitTime <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	TelegraphScale = Scale;
+	TelegraphIntervals.Add({ 0.f, FirstHitTime, Scale });
+	Character->SetTelegraphTimeScale(Scale);
+	TraceBeganHandle = MeleeTrace->OnTraceBegan.AddUObject(this, &UGA_MeleeAttack::EndTelegraph);
+
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		ASC->ExecuteGameplayCue(CombatTags::GameplayCue_Attack_Telegraph, ASC->MakeEffectContext());
+	}
+	UE_LOG(LogFirstAction, Verbose, TEXT("[%s] 예비 동작: %s 배율 %.2f, 판정까지 %.2f초(몽타주)"),
+		*GetNameSafe(Character), *GetNameSafe(Montage), Scale, FirstHitTime);
+}
+
+void UGA_MeleeAttack::EndTelegraph()
+{
+	ACombatCharacterBase* Character = GetCombatCharacter();
+	if (TraceBeganHandle.IsValid())
+	{
+		if (UMeleeTraceComponent* MeleeTrace = Character ? Character->GetMeleeTrace() : nullptr)
+		{
+			MeleeTrace->OnTraceBegan.Remove(TraceBeganHandle);
+		}
+		TraceBeganHandle.Reset();
+	}
+	if (Character)
+	{
+		if (TelegraphScale < 1.f)
+		{
+			Character->SetTelegraphTimeScale(1.f);
+		}
+		// 몽타주가 바뀌거나 끝나면 구간 감속도 끝낸다(다음 몽타주에서 다시 정한다)
+		Character->EndTelegraphWindow();
+		Character->SetTelegraphWindowStrength(0.f);
+	}
+	TelegraphScale = 1.f;
+	TelegraphIntervals.Reset();
 }
 
 void UGA_MeleeAttack::StartApproach(float StopGap, float Duration)
@@ -324,7 +429,8 @@ void UGA_MeleeAttack::StartApproach(float StopGap, float Duration)
 
 	// 구간 동안 대상이 움직여도(밀려나는 중 등) 목표를 다시 계산해 따라 붙는다
 	ApproachStopGap = StopGap;
-	ApproachEndTime = Character->GetWorld()->GetTimeSeconds() + Duration;
+	// 이동은 캐릭터 시간으로 흐른다(예비 동작 감속 중이면 더 오래). 추적은 이동이 끝나면(Root Motion Source가 없으면) 먼저 멈춘다
+	ApproachEndTime = Character->GetWorld()->GetTimeSeconds() + Duration / FMath::Max(Character->CustomTimeDilation, 0.05f);
 	Character->GetWorld()->GetTimerManager().SetTimer(ApproachTrackTimer, this, &UGA_MeleeAttack::TrackApproach, 1.f / 60.f, true);
 
 	UE_LOG(LogFirstAction, Log, TEXT("[%s] 접근: %s %.0fcm / %.2f초 (제자리 동작, Root Motion Source, 대상 추적)"),
@@ -456,6 +562,7 @@ void UGA_MeleeAttack::TryAdvanceCombo()
 		*GetNameSafe(Character), *GetNameSafe(CurrentAttack), *PressedTag.ToString(), *GetNameSafe(ChosenLink->NextAttack));
 
 	CurrentAttack = ChosenLink->NextAttack;
+	bComboContinuation = true;
 	PlayCurrentAttackMontage();
 }
 
@@ -678,6 +785,7 @@ void UGA_MeleeAttack::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 	RefreshedWarpModifiers.Reset();
 	ClearApproaches();
+	EndTelegraph();
 
 	CurrentAttack = nullptr;
 	MontageTask = nullptr;

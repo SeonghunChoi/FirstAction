@@ -32,6 +32,12 @@ public class FirstAction : ModuleRules
 		// 발 디딤 연출 (9-3): FootstepEffectComponent가 바닥 물리 재질로 물을 판정한다
 		PrivateDependencyModuleNames.AddRange(new string[] { "PhysicsCore", "Niagara" });   // PhysicsCore: 바닥 물리 재질(UPhysicalMaterial), Niagara: 물보라 시스템(선택)
 
+		// 게임 흐름 (9-4 이후): 로딩 대기가 PSO 준비(RHI PipelineStateCache, RenderCore ShaderPipelineCache)를 보고, 메뉴 위젯이 Slate 스타일을 쓴다
+		PrivateDependencyModuleNames.AddRange(new string[] { "RHI", "RenderCore", "SlateCore" });
+
+		// 길 안내 (9-4 이후): RouteGuide가 다음 구간까지 내비 경로를 구한다
+		PrivateDependencyModuleNames.Add("NavigationSystem");
+
 		// 에디터 도구 (9-3): 래그돌 물리 에셋 생성(FirstActionEditorLibrary). 게임 빌드에는 넣지 않는다
 		if (Target.bBuildEditor)
 		{

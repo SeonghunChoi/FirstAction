@@ -346,9 +346,38 @@ void ACombatCharacterBase::EndTimeSlow()
 	UpdateTimeDilation();
 }
 
+void ACombatCharacterBase::SetTelegraphTimeScale(float Scale)
+{
+	ActiveTelegraphDilation = FMath::Clamp(Scale, 0.05f, 1.f);
+	UpdateTimeDilation();
+}
+
+void ACombatCharacterBase::BeginTelegraphWindow(float WindowScale)
+{
+	if (TelegraphWindowStrength <= 0.f)
+	{
+		return;   // 플레이어, 또는 공격 몽타주가 아닐 때
+	}
+	bTelegraphWindowActive = true;
+	SetTelegraphTimeScale(FMath::Lerp(1.f, WindowScale, FMath::Clamp(TelegraphWindowStrength, 0.f, 1.f)));
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->ExecuteGameplayCue(CombatTags::GameplayCue_Attack_Telegraph, AbilitySystemComponent->MakeEffectContext());
+	}
+}
+
+void ACombatCharacterBase::EndTelegraphWindow()
+{
+	if (bTelegraphWindowActive)
+	{
+		bTelegraphWindowActive = false;
+		SetTelegraphTimeScale(1.f);
+	}
+}
+
 void ACombatCharacterBase::UpdateTimeDilation()
 {
-	CustomTimeDilation = FMath::Min(ActiveHitStopDilation, ActiveTimeSlowDilation);
+	CustomTimeDilation = FMath::Min3(ActiveHitStopDilation, ActiveTimeSlowDilation, ActiveTelegraphDilation);
 }
 
 void ACombatCharacterBase::StartJustDodgeSlow()

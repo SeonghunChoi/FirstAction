@@ -33,6 +33,9 @@ def body(out, prefix, src, flinch, knock, groggy, death):
     return ms
 
 
+TELEGRAPH = (0.55, 0.8, 0.5)   # 구간 없는 몽타주의 첫 타·콤보 배율, 구간 있는 몽타주의 콤보 적용 비율
+
+
 def character_data(path, template, mass, ms):
     d = make_data(path, template, dict(
         mass=mass,
@@ -40,6 +43,8 @@ def character_data(path, template, mass, ms):
         stagger_montage=ms["stagger"], stagger_head_montage=ms["stagger"],
         knockdown_montage=ms["knock"], groggy_montage=ms["groggy"], death_montage=ms["death"],
         dodge_montage=None, guard_montage=None,   # 적은 회피·가드를 쓰지 않는다 (틀의 마네킹 몽타주를 남기지 않는다)
+        # 공격 예비 동작 감속 (9-4 이후): 첫 타 크게, 콤보로 이어진 타는 조금
+        telegraph_time_scale=TELEGRAPH[0], telegraph_combo_time_scale=TELEGRAPH[1], telegraph_combo_strength=TELEGRAPH[2],
     ))
     saved.append(path)
     return d
@@ -86,7 +91,11 @@ kwang_values = {
     "D": (GA + "DA_Attack_Light_03", dict(damage=15.0, impact_force=64000.0, post_hit_spacing=200.0, post_hit_move_duration=0.35, hit_stop_duration=0.08, max_warp_distance=200.0)),
     "Flurry": (GA + "DA_Attack_Heavy_01", dict(damage=12.0, impact_force=36000.0, post_hit_spacing=90.0, post_hit_move_duration=0.2, hit_stop_duration=0.08, max_warp_distance=250.0)),
 }
-kd = build_attacks(KO, "Kwang", kwang_attacks, kwang_values, {"A": [(L, "B")], "B": [(L, "C")], "C": [(L, "D")]})
+# 예비 동작 구간 (9-4 이후 2차): Kwang 공격 클립은 첫 프레임이 이미 칼을 치켜든 정점이고 0.03초 뒤 내려친다(칼끝 속도 측정).
+# 맨 앞 몇 프레임을 아주 느리게 해 "들고 멈칫했다가 내리침"으로 만든다. (시작, 끝, 배율), 몽타주 시간
+KWANG_TELEGRAPH = {"A": [(0.005, 0.05, 0.12)], "B": [(0.005, 0.05, 0.12)], "C": [(0.005, 0.06, 0.15)],
+                   "D": [(0.005, 0.07, 0.12)], "Flurry": [(0.005, 0.04, 0.12)]}
+kd = build_attacks(KO, "Kwang", kwang_attacks, kwang_values, {"A": [(L, "B")], "B": [(L, "C")], "C": [(L, "D")]}, KWANG_TELEGRAPH)
 kms = body(KO, "Kwang", KA, "Hitreact_Fwd", ("Knockback_Bwd", 1.3), [("Stun_Start", 0.0, None), ("Stun_Loop", 0.0, None)], "Death_Bwd")
 kc = character_data(KO + "Data/DA_Character_Kwang", GIT + "Data/Characters/DA_Character_Enemy", 80.0, kms)
 kp = pattern_data(KO + "Data/DA_Pattern_Kwang", GIT + "Data/Enemies/DA_Pattern_Enemy", [
@@ -119,10 +128,14 @@ grey_values = {
     "PrimaryC": (GA + "DA_Attack_Heavy_01", dict(damage=25.0, impact_force=64000.0, post_hit_spacing=200.0, post_hit_move_duration=0.35, hit_stop_duration=0.12, max_warp_distance=250.0)),
     "Slam": (GA + "DA_Attack_Heavy_01", dict(damage=30.0, impact_force=72000.0, post_hit_spacing=220.0, post_hit_move_duration=0.35, hit_stop_duration=0.14, max_warp_distance=300.0)),
 }
+# 예비 동작 구간: Fast는 Kwang처럼 맨 앞, Primary·Slam은 칼끝이 가장 느린 정점(측정 0.27 / 0.18 / 0.47 / 0.33~0.63초) 부근
+GREY_TELEGRAPH = {"Fast_A": [(0.005, 0.04, 0.12)], "Fast_B": [(0.005, 0.04, 0.12)], "Fast_C": [(0.005, 0.04, 0.12)],
+                  "PrimaryA": [(0.22, 0.30, 0.25)], "PrimaryB": [(0.14, 0.24, 0.3)], "PrimaryC": [(0.42, 0.50, 0.3)],
+                  "Slam": [(0.60, 0.68, 0.35)]}
 gd = build_attacks(GO, "Greystone", grey_attacks, grey_values, {
     "Fast_A": [(L, "Fast_B"), (H, "PrimaryB")], "Fast_B": [(L, "Fast_C")],
     "PrimaryA": [(H, "PrimaryB")], "PrimaryB": [(H, "PrimaryC")],
-})
+}, GREY_TELEGRAPH)
 gms = body(GO, "Greystone", GAN, "HitReact_Front", None, [("Stun_Start", 0.0, None), ("Stun_Idle", 0.0, 1.0)], "Death")
 gc = character_data(GO + "Data/DA_Character_Greystone", GIT + "Data/Characters/DA_Character_Elite", 180.0, gms)
 gp = pattern_data(GO + "Data/DA_Pattern_Greystone", GIT + "Data/Enemies/DA_Pattern_Elite", [

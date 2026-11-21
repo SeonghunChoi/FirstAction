@@ -156,6 +156,17 @@ public:
 	// 히트스톱과 따로 관리하고, 둘이 겹치면 더 느린 배율을 적용한다. 이미 더 길고 더 느린 슬로모션이 걸려 있으면 무시한다
 	void ApplyTimeSlow(float Duration, float Dilation);
 
+	// 공격 예비 동작 감속 (9-4 이후). 1이면 끈다. 공격 어빌리티가 몽타주 시작에 켜고 첫 판정 구간이 열리면 끈다.
+	// 애니메이션과 접근 이동이 함께 느려진다. 히트스톱·슬로모션과 겹치면 더 느린 배율
+	void SetTelegraphTimeScale(float Scale);
+	float GetTelegraphTimeScale() const { return ActiveTelegraphDilation; }
+
+	// 몽타주의 예비 동작 구간(ANS_Telegraph)을 얼마나 따를지 (0 = 무시, 1 = 구간 배율 그대로). 공격 어빌리티가 몽타주마다 정한다
+	void SetTelegraphWindowStrength(float Strength) { TelegraphWindowStrength = Strength; }
+	// ANS_Telegraph가 부른다: 구간 동안 감속하고 시작할 때 GameplayCue.Attack.Telegraph
+	void BeginTelegraphWindow(float WindowScale);
+	void EndTelegraphWindow();
+
 	// 타격 후 이동: Direction(수평) 쪽으로 Distance(cm, 음수면 반대쪽)를 Duration초에 걸쳐 움직인다 (Step 6-5)
 	// 루트 모션 몽타주 재생 중: 애니메이션 루트 모션에 남은 이동량을 더한다 (애니메이션 전진은 살아 있음)
 	// 그 밖: Root Motion Source(Override)로 같은 거리를 옮긴다. 엔진은 애니메이션 루트 모션이 있으면 Root Motion Source를 무시한다
@@ -256,6 +267,9 @@ private:
 	// 지금 걸려 있는 출처별 시간 배율 (1이면 없음)
 	float ActiveHitStopDilation = 1.f;
 	float ActiveTimeSlowDilation = 1.f;
+	float ActiveTelegraphDilation = 1.f;
+	float TelegraphWindowStrength = 0.f;
+	bool bTelegraphWindowActive = false;
 
 	// 캐릭터 무브먼트의 ProcessRootMotionPostConvertToWorld에 연결 (6-5). 월드 기준 애니메이션 루트 모션에 이번 프레임 몫을 더한다
 	// Motion Warping(6-2)은 Pre 쪽을 쓰므로 겹치지 않는다. 애니메이션 루트 모션이 있는 프레임에만 불린다

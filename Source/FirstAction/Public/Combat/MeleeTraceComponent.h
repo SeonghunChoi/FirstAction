@@ -30,6 +30,9 @@ public:
 	// 한 번의 휘두름 판정 시작: 맞은 대상 목록을 비우고 현재 칼날 위치를 기준점으로 기록한다
 	void BeginTrace();
 
+	// 판정 구간이 열릴 때마다 알린다 (공격 예비 동작이 끝나는 순간, 9-4 이후)
+	FSimpleMulticastDelegate OnTraceBegan;
+
 	// 판정 끝
 	void EndTrace();
 
