@@ -21,6 +21,8 @@ $Maps = "/Game/Portfolio/Maps/Lvl_TestEnemies+/Game/Portfolio/Maps/Lvl_Training"
 
 $RunUAT = Join-Path $EngineRoot "Engine\Build\BatchFiles\RunUAT.bat"
 if (-not (Test-Path $RunUAT)) { throw "RunUAT를 찾을 수 없습니다: $RunUAT (-EngineRoot로 엔진 경로 지정)" }
+# Live Coding 잠금은 엔진 실행 파일 단위라 다른 폴더(클론)를 빌드해도 열린 에디터가 막는다
+if (Get-Process UnrealEditor -ErrorAction SilentlyContinue) { throw "에디터를 닫고 실행하세요(Live Coding이 빌드를 막습니다)" }
 
 # 깨끗한 클론 (이전 클론은 지우고 새로)
 if (Test-Path $CloneDir) {
